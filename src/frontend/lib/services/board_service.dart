@@ -39,6 +39,11 @@ class BoardService {
       .snapshots()
       .map((s) => [for (final d in s.docs) RepoInfo.fromDoc(d)]);
 
+  Stream<RepoInfo?> repo(String id) => _repos
+      .doc(id)
+      .snapshots()
+      .map((d) => d.exists ? RepoInfo.fromDoc(d) : null);
+
   Stream<ScheduleInfo> schedule() =>
       _schedule.snapshots().map((d) => ScheduleInfo.fromMap(d.data()));
 
@@ -124,6 +129,14 @@ class BoardService {
     }
     await _items.doc(itemId).update(updates);
   }
+
+  /// Edits the text of an existing message and stamps `editedAt`. Used for the
+  /// app user's own messages; the agent picks up the new text on its next run.
+  Future<void> editMessage(String itemId, String messageId, String text) =>
+      _items.doc(itemId).collection('messages').doc(messageId).update({
+        'text': text,
+        'editedAt': FieldValue.serverTimestamp(),
+      });
 
   Future<String> downloadUrl(Attachment a) =>
       _storage.ref(a.storagePath).getDownloadURL();

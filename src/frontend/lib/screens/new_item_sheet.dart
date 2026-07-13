@@ -6,23 +6,21 @@ import '../models/models.dart';
 import '../services/board_service.dart';
 import 'home_screen.dart';
 
-Future<void> showNewItemSheet(BuildContext context) {
-  return showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    builder: (_) => const _NewItemSheet(),
+/// Opens the full-screen "new action item" composer.
+Future<void> openNewItemScreen(BuildContext context) {
+  return Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => const NewItemScreen(), fullscreenDialog: true),
   );
 }
 
-class _NewItemSheet extends StatefulWidget {
-  const _NewItemSheet();
+class NewItemScreen extends StatefulWidget {
+  const NewItemScreen({super.key});
 
   @override
-  State<_NewItemSheet> createState() => _NewItemSheetState();
+  State<NewItemScreen> createState() => _NewItemScreenState();
 }
 
-class _NewItemSheetState extends State<_NewItemSheet> {
+class _NewItemScreenState extends State<NewItemScreen> {
   final _title = TextEditingController();
   final _message = TextEditingController();
   String? _repoId;
@@ -41,24 +39,24 @@ class _NewItemSheetState extends State<_NewItemSheet> {
   @override
   Widget build(BuildContext context) {
     final board = context.read<BoardService>();
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+    return Scaffold(
+      appBar: AppBar(
+        titleTextStyle: Theme.of(context).textTheme.titleMedium,
+        leading: IconButton(
+          tooltip: 'Close',
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        title: const Text('New action item'),
       ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           children: [
-            Text('New action item',
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 16),
             TextField(
               controller: _title,
               autofocus: true,
+              textInputAction: TextInputAction.next,
               decoration: const InputDecoration(labelText: 'Title'),
             ),
             const SizedBox(height: 12),
@@ -68,20 +66,10 @@ class _NewItemSheetState extends State<_NewItemSheet> {
                 final repos = (snap.data ?? [])
                     .where((r) => r.status == 'active')
                     .toList()
-                  ..sort((a, b) => a.id.compareTo(b.id));
-                return DropdownButtonFormField<String>(
-                  initialValue: _repoId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Repo'),
-                  items: [
-                    for (final r in repos)
-                      DropdownMenuItem(
-                        value: r.id,
-                        child: Text(r.path.isEmpty ? r.name : r.path,
-                            overflow: TextOverflow.ellipsis),
-                      ),
-                  ],
-                  onChanged: (v) => setState(() => _repoId = v),
+                  ..sort((a, b) => _repoLabel(a).compareTo(_repoLabel(b)));
+                return _RepoAutocomplete(
+                  repos: repos,
+                  onSelected: (id) => setState(() => _repoId = id),
                 );
               },
             ),
@@ -91,6 +79,7 @@ class _NewItemSheetState extends State<_NewItemSheet> {
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     initialValue: _model,
+                    isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Model'),
                     items: [
                       for (final m in modelOptions)
@@ -103,6 +92,7 @@ class _NewItemSheetState extends State<_NewItemSheet> {
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     initialValue: _effort,
+                    isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Effort'),
                     items: [
                       for (final e in effortOptions)
@@ -116,8 +106,8 @@ class _NewItemSheetState extends State<_NewItemSheet> {
             const SizedBox(height: 12),
             TextField(
               controller: _message,
-              minLines: 3,
-              maxLines: 8,
+              minLines: 4,
+              maxLines: 10,
               decoration: const InputDecoration(
                 labelText: 'Description / first message',
                 alignLabelWithHint: true,
@@ -141,7 +131,7 @@ class _NewItemSheetState extends State<_NewItemSheet> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             FilledButton(
               onPressed: _saving ? null : () => _create(board),
               child: _saving
@@ -206,5 +196,94 @@ class _NewItemSheetState extends State<_NewItemSheet> {
             .showSnackBar(SnackBar(content: Text('Failed to create: $e')));
       }
     }
+  }
+}
+
+String _repoLabel(RepoInfo r) => r.path.isEmpty ? r.name : r.path;
+
+/// Type-to-filter repo picker built on Flutter's [Autocomplete]. Shows the
+/// matching repos as the user types instead of forcing a long dropdown.
+class _RepoAutocomplete extends StatelessWidget {
+  const _RepoAutocomplete({required this.repos, required this.onSelected});
+
+  final List<RepoInfo> repos;
+  final ValueChanged<String?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Autocomplete<RepoInfo>(
+      displayStringForOption: _repoLabel,
+      optionsBuilder: (value) {
+        final q = value.text.trim().toLowerCase();
+        if (q.isEmpty) return repos;
+        return repos.where((r) =>
+            _repoLabel(r).toLowerCase().contains(q) ||
+            r.name.toLowerCase().contains(q) ||
+            r.id.toLowerCase().contains(q));
+      },
+      onSelected: (r) => onSelected(r.id),
+      fieldViewBuilder: (context, controller, focusNode, onSubmit) {
+        return TextField(
+          controller: controller,
+          focusNode: focusNode,
+          decoration: InputDecoration(
+            labelText: 'Repo',
+            hintText: 'Search repos…',
+            prefixIcon: const Icon(Icons.search, size: 20),
+            suffixIcon: controller.text.isEmpty
+                ? null
+                : IconButton(
+                    icon: const Icon(Icons.clear, size: 18),
+                    onPressed: () {
+                      controller.clear();
+                      onSelected(null);
+                    },
+                  ),
+          ),
+          onChanged: (_) => onSelected(null),
+        );
+      },
+      optionsViewBuilder: (context, onSelect, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 8,
+            color: Theme.of(context).cardColor,
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: Theme.of(context).dividerColor),
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 280, maxWidth: 480),
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                shrinkWrap: true,
+                children: [
+                  for (final r in options)
+                    ListTile(
+                      dense: true,
+                      title: Text(_repoLabel(r),
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13)),
+                      subtitle: r.remote == null
+                          ? null
+                          : Text(r.remote!,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color:
+                                    scheme.onSurface.withValues(alpha: 0.6),
+                              )),
+                      onTap: () => onSelect(r),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }

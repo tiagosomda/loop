@@ -91,6 +91,7 @@ class ThreadMessage {
   final String text;
   final List<Attachment> attachments;
   final DateTime? createdAt;
+  final DateTime? editedAt;
 
   ThreadMessage({
     required this.id,
@@ -98,6 +99,7 @@ class ThreadMessage {
     required this.text,
     required this.attachments,
     this.createdAt,
+    this.editedAt,
   });
 
   factory ThreadMessage.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -111,6 +113,7 @@ class ThreadMessage {
           Attachment.fromMap(Map<String, dynamic>.from(a)),
       ],
       createdAt: _ts(d['createdAt']),
+      editedAt: _ts(d['editedAt']),
     );
   }
 }

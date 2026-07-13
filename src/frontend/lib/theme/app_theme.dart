@@ -33,6 +33,9 @@ class AppTheme {
         outline: const Color(0xFFD8DEE9),
       );
 
+  // Shared corner radius so every surface reads from the same design grid.
+  static const double radius = 12;
+
   static ThemeData _base(
     ColorScheme scheme, {
     required Color scaffold,
@@ -42,11 +45,14 @@ class AppTheme {
     final text = GoogleFonts.spaceGroteskTextTheme(
       ThemeData(brightness: scheme.brightness).textTheme,
     );
+    final onSurface = scheme.onSurface;
+    final mono = GoogleFonts.jetBrainsMono();
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: scaffold,
       textTheme: text,
+      canvasColor: card,
       appBarTheme: AppBarTheme(
         backgroundColor: scaffold,
         elevation: 0,
@@ -62,14 +68,16 @@ class AppTheme {
         color: card,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(radius),
           side: BorderSide(color: outline),
         ),
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       ),
       chipTheme: ChipThemeData(
+        labelStyle: mono.copyWith(fontSize: 12, color: onSurface),
+        side: BorderSide(color: outline),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(8),
           side: BorderSide(color: outline),
         ),
       ),
@@ -77,12 +85,66 @@ class AppTheme {
         filled: true,
         fillColor: card,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(radius),
           borderSide: BorderSide(color: outline),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(radius),
           borderSide: BorderSide(color: outline),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: BorderSide(color: scheme.primary, width: 1.5),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius),
+          ),
+          textStyle: GoogleFonts.spaceGrotesk(
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: outline),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius),
+          ),
+        ),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: card,
+        elevation: 8,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius),
+          side: BorderSide(color: outline),
+        ),
+        textStyle: text.bodyMedium,
+      ),
+      dropdownMenuTheme: DropdownMenuThemeData(
+        textStyle: text.bodyMedium,
+        menuStyle: MenuStyle(
+          backgroundColor: WidgetStatePropertyAll(card),
+          surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(radius),
+              side: BorderSide(color: outline),
+            ),
+          ),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: card,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: outline),
         ),
       ),
       dividerColor: outline,

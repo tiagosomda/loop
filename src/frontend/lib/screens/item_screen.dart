@@ -1,10 +1,10 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/models.dart';
 import '../services/board_service.dart';
-import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 
 class ItemScreen extends StatefulWidget {
@@ -39,7 +39,7 @@ class _ItemScreenState extends State<ItemScreen> {
             titleTextStyle: Theme.of(context).textTheme.titleMedium,
             title: Text(item?.title ?? '…'),
             actions: [
-              if (item != null) _StatusMenu(item: item),
+              if (item != null) _RepoLinkButton(repoId: item.repoId),
               const SizedBox(width: 8),
             ],
           ),
@@ -133,58 +133,160 @@ class _ItemHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final board = context.read<BoardService>();
-    final muted = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6);
+    final scheme = Theme.of(context).colorScheme;
+    final muted = scheme.onSurface.withValues(alpha: 0.6);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 6,
-        crossAxisAlignment: WrapCrossAlignment.center,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          StatusChip(status: item.status),
-          Text(repoShortName(item.repoId),
-              style: TextStyle(fontSize: 12, color: muted)),
-          Text('updated ${relativeTime(item.updatedAt)}',
-              style: TextStyle(fontSize: 12, color: muted)),
-          _dropdown(
-            'model',
-            item.model ?? 'default',
-            modelOptions,
-            (v) => board.setModelEffort(item.id,
-                model: v == 'default' ? null : v,
-                effortLevel: item.effortLevel),
+          Row(
+            children: [
+              _StatusPill(item: item),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(Icons.folder_outlined, size: 14, color: muted),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        repoShortName(item.repoId),
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: muted),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Icon(Icons.schedule, size: 14, color: muted),
+                    const SizedBox(width: 4),
+                    Text('updated ${relativeTime(item.updatedAt)}',
+                        style: TextStyle(fontSize: 12, color: muted)),
+                  ],
+                ),
+              ),
+            ],
           ),
-          _dropdown(
-            'effort',
-            item.effortLevel ?? 'default',
-            effortOptions,
-            (v) => board.setModelEffort(item.id,
-                model: item.model, effortLevel: v == 'default' ? null : v),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _HeaderSelector(
+                  icon: Icons.memory,
+                  label: 'model',
+                  value: item.model ?? 'default',
+                  options: modelOptions,
+                  onChanged: (v) => board.setModelEffort(item.id,
+                      model: v == 'default' ? null : v,
+                      effortLevel: item.effortLevel),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _HeaderSelector(
+                  icon: Icons.bolt_outlined,
+                  label: 'effort',
+                  value: item.effortLevel ?? 'default',
+                  options: effortOptions,
+                  onChanged: (v) => board.setModelEffort(item.id,
+                      model: item.model,
+                      effortLevel: v == 'default' ? null : v),
+                ),
+              ),
+            ],
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _dropdown(String label, String value, List<String> options,
-      ValueChanged<String> onChanged) {
-    return DropdownButtonHideUnderline(
-      child: DropdownButton<String>(
-        value: value,
-        isDense: true,
-        style: const TextStyle(fontSize: 12),
-        items: [
-          for (final o in options)
-            DropdownMenuItem(value: o, child: Text('$label: $o')),
-        ],
-        onChanged: (v) => v == null ? null : onChanged(v),
       ),
     );
   }
 }
 
-class _StatusMenu extends StatelessWidget {
-  const _StatusMenu({required this.item});
+/// Compact, theme-aware selector used for model/effort in the item header.
+/// Replaces the raw [DropdownButton] (which rendered dark text off-theme in
+/// dark mode) with a bordered chip that opens a themed popup menu.
+class _HeaderSelector extends StatelessWidget {
+  const _HeaderSelector({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final List<String> options;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final muted = scheme.onSurface.withValues(alpha: 0.6);
+    return PopupMenuButton<String>(
+      tooltip: label,
+      initialValue: value,
+      position: PopupMenuPosition.under,
+      onSelected: onChanged,
+      itemBuilder: (_) => [
+        for (final o in options)
+          PopupMenuItem(
+            value: o,
+            child: Row(
+              children: [
+                Icon(
+                  o == value ? Icons.check : null,
+                  size: 16,
+                  color: scheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(o),
+              ],
+            ),
+          ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: scheme.surface.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Theme.of(context).dividerColor),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 14, color: scheme.primary),
+            const SizedBox(width: 6),
+            Text(
+              label.toUpperCase(),
+              style: TextStyle(
+                fontSize: 10,
+                letterSpacing: 1,
+                color: muted,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                value,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: scheme.onSurface,
+                ),
+              ),
+            ),
+            Icon(Icons.arrow_drop_down, size: 18, color: muted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Tappable status chip in the item content — tapping it opens the same
+/// status-change menu that used to live in the app bar.
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.item});
 
   final ActionItem item;
 
@@ -193,10 +295,8 @@ class _StatusMenu extends StatelessWidget {
     final board = context.read<BoardService>();
     return PopupMenuButton<String>(
       tooltip: 'Change status',
-      icon: Icon(
-        Icons.flag_outlined,
-        color: AppTheme.statusColor(item.status, Theme.of(context).colorScheme),
-      ),
+      padding: EdgeInsets.zero,
+      position: PopupMenuPosition.under,
       onSelected: (s) => board.setStatus(item.id, s),
       itemBuilder: (_) => [
         for (final s in itemStatuses)
@@ -214,6 +314,34 @@ class _StatusMenu extends StatelessWidget {
             ),
           ),
       ],
+      child: StatusChip(status: item.status),
+    );
+  }
+}
+
+/// App-bar icon linking out to the item's repo, replacing the old status
+/// menu that used to live at the top right.
+class _RepoLinkButton extends StatelessWidget {
+  const _RepoLinkButton({required this.repoId});
+
+  final String repoId;
+
+  @override
+  Widget build(BuildContext context) {
+    final board = context.read<BoardService>();
+    return StreamBuilder<RepoInfo?>(
+      stream: board.repo(repoId),
+      builder: (context, snap) {
+        final remote = snap.data?.remote;
+        return IconButton(
+          tooltip: remote == null ? 'No repo remote' : 'Open repo',
+          icon: const Icon(Icons.open_in_new),
+          onPressed: remote == null
+              ? null
+              : () => launchUrl(Uri.parse(remote),
+                  webOnlyWindowName: '_blank'),
+        );
+      },
     );
   }
 }
@@ -240,8 +368,15 @@ class _Thread extends StatelessWidget {
           reverse: true,
           padding: const EdgeInsets.symmetric(vertical: 12),
           itemCount: messages.length,
-          itemBuilder: (context, i) =>
-              _MessageBubble(message: messages[messages.length - 1 - i]),
+          itemBuilder: (context, i) {
+            final index = messages.length - 1 - i;
+            return _MessageBubble(
+              itemId: itemId,
+              message: messages[index],
+              // "Replied to" = anything exists after it in the thread.
+              hasSubsequent: index < messages.length - 1,
+            );
+          },
         );
       },
     );
@@ -249,15 +384,22 @@ class _Thread extends StatelessWidget {
 }
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message});
+  const _MessageBubble({
+    required this.itemId,
+    required this.message,
+    required this.hasSubsequent,
+  });
 
+  final String itemId;
   final ThreadMessage message;
+  final bool hasSubsequent;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final isAgent = message.author == 'agent';
     final accent = isAgent ? scheme.secondary : scheme.primary;
+    final faint = scheme.onSurface.withValues(alpha: 0.45);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
       child: Column(
@@ -279,11 +421,24 @@ class _MessageBubble extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 relativeTime(message.createdAt),
-                style: TextStyle(
-                  fontSize: 11,
-                  color: scheme.onSurface.withValues(alpha: 0.45),
-                ),
+                style: TextStyle(fontSize: 11, color: faint),
               ),
+              if (message.editedAt != null) ...[
+                const SizedBox(width: 6),
+                Text('· edited',
+                    style: TextStyle(fontSize: 11, color: faint)),
+              ],
+              if (!isAgent) ...[
+                const Spacer(),
+                InkWell(
+                  borderRadius: BorderRadius.circular(6),
+                  onTap: () => _edit(context),
+                  child: Padding(
+                    padding: const EdgeInsets.all(2),
+                    child: Icon(Icons.edit_outlined, size: 15, color: faint),
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 4),
@@ -318,6 +473,53 @@ class _MessageBubble extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _edit(BuildContext context) async {
+    final board = context.read<BoardService>();
+    final controller = TextEditingController(text: message.text);
+    final text = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit message'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (hasSubsequent)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  'This message already has a reply, so the agent likely '
+                  "won't pick up the edit — you can still make it.",
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              minLines: 3,
+              maxLines: 10,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (text == null || text.isEmpty || text == message.text) return;
+    await board.editMessage(itemId, message.id, text);
   }
 }
 

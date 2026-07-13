@@ -32,7 +32,7 @@ class HomeScreen extends StatelessWidget {
           IconButton(
             tooltip: 'New action item',
             icon: const Icon(Icons.add),
-            onPressed: () => showNewItemSheet(context),
+            onPressed: () => openNewItemScreen(context),
           ),
           const ThemeToggleButton(),
           IconButton(
@@ -118,23 +118,18 @@ class _BoardControls extends StatelessWidget {
                   onChanged: app.setSearch,
                 ),
               ),
-              const SizedBox(width: 8),
-              SegmentedButton<BoardView>(
-                showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(
-                    value: BoardView.list,
-                    icon: Icon(Icons.view_agenda_outlined, size: 18),
-                  ),
-                  ButtonSegment(
-                    value: BoardView.kanban,
-                    icon: Icon(Icons.view_kanban_outlined, size: 18),
-                  ),
-                ],
-                selected: {app.boardView},
-                onSelectionChanged: (s) => app.setBoardView(s.first),
-              ),
               const SizedBox(width: 4),
+              IconButton(
+                tooltip: app.boardView == BoardView.list
+                    ? 'Switch to kanban view'
+                    : 'Switch to list view',
+                icon: Icon(
+                  app.boardView == BoardView.list
+                      ? Icons.view_kanban_outlined
+                      : Icons.view_agenda_outlined,
+                ),
+                onPressed: app.cycleBoardView,
+              ),
               PopupMenuButton<String>(
                 tooltip: 'Sort',
                 icon: const Icon(Icons.sort),
@@ -204,18 +199,30 @@ class _KanbanView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    // Size columns to the viewport so a single column reads well in portrait
+    // while still leaving a peek of the next one to signal horizontal scroll.
+    final width = (MediaQuery.of(context).size.width - 24).clamp(240.0, 320.0);
     return ListView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
       children: [
         for (final status in itemStatuses)
-          SizedBox(
-            width: 300,
+          Container(
+            width: width,
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: scheme.surface.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(AppTheme.radius),
+              border: Border.all(
+                color: AppTheme.statusColor(status, scheme)
+                    .withValues(alpha: 0.25),
+              ),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
                   child: Row(
                     children: [
                       StatusChip(status: status),
@@ -232,6 +239,7 @@ class _KanbanView extends StatelessWidget {
                 ),
                 Expanded(
                   child: ListView(
+                    padding: const EdgeInsets.only(bottom: 8),
                     children: [
                       for (final item
                           in items.where((i) => i.status == status))

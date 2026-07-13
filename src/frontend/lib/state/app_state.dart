@@ -53,6 +53,12 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void cycleBoardView() {
+    final values = BoardView.values;
+    boardView = values[(boardView.index + 1) % values.length];
+    notifyListeners();
+  }
+
   void setSearch(String value) {
     search = value;
     notifyListeners();
