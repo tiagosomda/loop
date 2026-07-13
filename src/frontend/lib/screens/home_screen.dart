@@ -98,6 +98,27 @@ class HomeScreen extends StatelessWidget {
           return Column(
             children: [
               _BoardControls(app: app),
+              // Explicit refresh affordance, on top of RefreshIndicator's own
+              // pull animation: RefreshIndicator's swipe-triggered spinner
+              // lives inside a ReorderableListView's Scrollable, and a
+              // pull-to-refresh that resolves in a handful of milliseconds
+              // (a warm local cache, or an offline round-trip that fails
+              // fast) can complete before the user perceives it at all. This
+              // slim bar is driven by BoardService.isRefreshing directly, so
+              // it's always a visible, unambiguous confirmation regardless
+              // of gesture recognition or how quickly the fetch resolves.
+              ValueListenableBuilder<bool>(
+                valueListenable: board.isRefreshing,
+                builder: (context, refreshing, _) => AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 150),
+                  child: refreshing
+                      ? const LinearProgressIndicator(
+                          key: ValueKey('refreshing'),
+                          minHeight: 2,
+                        )
+                      : const SizedBox(height: 2, key: ValueKey('idle')),
+                ),
+              ),
               Expanded(
                 child: app.boardView == BoardView.list
                     ? _ListView(

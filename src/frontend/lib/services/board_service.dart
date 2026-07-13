@@ -1,9 +1,18 @@
-import 'dart:typed_data';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/models.dart';
+
+/// Minimum time [BoardService.refresh]'s in-flight state stays visible.
+///
+/// A pull-to-refresh that succeeds (or fails) against a warm local cache can
+/// round-trip in a handful of milliseconds — fast enough that the spinner
+/// driven purely by the awaited [Future] never renders a visible frame. This
+/// floor guarantees the caller (the pull-to-refresh UI) gets a perceivable
+/// confirmation regardless of how quickly the underlying fetch resolves.
+@visibleForTesting
+const minRefreshIndicatorDuration = Duration(milliseconds: 500);
 
 /// All Firestore/Storage access, scoped under the shared-database-safe
 /// `dev-loop/` root (see docs/design.md).
@@ -18,6 +27,12 @@ class BoardService {
   DocumentReference<Map<String, dynamic>> get _schedule =>
       _db.doc('dev-loop/app/meta/schedule');
 
+  /// Whether a [refresh] round-trip is currently in flight. The board views
+  /// use this to render an explicit "refreshing" affordance (on top of
+  /// [RefreshIndicator]'s own pull animation) so the user always gets visible
+  /// confirmation, independent of how the pull gesture was recognized.
+  final ValueNotifier<bool> isRefreshing = ValueNotifier(false);
+
   Stream<List<ActionItem>> items() => _items
       .orderBy('updatedAt', descending: true)
       .snapshots()
@@ -29,6 +44,8 @@ class BoardService {
   /// affordance — it re-primes the snapshot after being offline/backgrounded
   /// and lets the callback await a real server round-trip.
   Future<void> refresh() async {
+    isRefreshing.value = true;
+    final started = DateTime.now();
     try {
       await _items
           .orderBy('updatedAt', descending: true)
@@ -36,6 +53,12 @@ class BoardService {
     } catch (_) {
       // Best-effort: the live [items] stream keeps the board current even
       // if this forced server round-trip fails (e.g. while offline).
+    } finally {
+      final elapsed = DateTime.now().difference(started);
+      if (elapsed < minRefreshIndicatorDuration) {
+        await Future<void>.delayed(minRefreshIndicatorDuration - elapsed);
+      }
+      isRefreshing.value = false;
     }
   }
 

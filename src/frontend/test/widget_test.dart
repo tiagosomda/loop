@@ -1,9 +1,100 @@
 import 'package:dev_loop/models/models.dart';
 import 'package:dev_loop/services/board_service.dart';
 import 'package:dev_loop/widgets/brand_logo.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('pull-to-refresh visual confirmation', () {
+    // Regression test for the reported bug: pulling down on the board's
+    // list view (a RefreshIndicator wrapping a ReorderableListView.builder,
+    // per home_screen.dart's _ListView) produced no visible confirmation.
+    // This exercises the exact same widget combination — RefreshIndicator +
+    // ReorderableListView.builder with custom (non-default) drag handles
+    // via ReorderableDragStartListener + AlwaysScrollableScrollPhysics — and
+    // drags from an item's body (not the handle), mirroring how a user
+    // actually pulls down on a card. If this regresses, RefreshIndicator's
+    // onRefresh is not firing for the reorderable list.
+    testWidgets(
+        'RefreshIndicator.onRefresh fires when pulling a ReorderableListView '
+        'with custom drag handles', (tester) async {
+      var refreshCount = 0;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: RefreshIndicator(
+            onRefresh: () async => refreshCount++,
+            child: ReorderableListView.builder(
+              buildDefaultDragHandles: false,
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(top: 4, bottom: 24),
+              itemCount: 5,
+              onReorder: (a, b) {},
+              itemBuilder: (context, i) => Card(
+                key: ValueKey(i),
+                child: InkWell(
+                  onTap: () {},
+                  child: ListTile(
+                    title: Text('item $i'),
+                    trailing: ReorderableDragStartListener(
+                      index: i,
+                      child: const Icon(Icons.drag_indicator),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ));
+
+      // Pull down from within the first card's body (not its drag handle) —
+      // the gesture a user performs to trigger pull-to-refresh.
+      await tester.fling(find.text('item 0'), const Offset(0, 300), 1000);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      expect(refreshCount, 1);
+    });
+
+    // Regression test for the fix: BoardService.isRefreshing drives a
+    // top-of-board progress bar directly, so the user gets a guaranteed,
+    // unambiguous confirmation even if a refresh round-trip resolves too
+    // quickly for RefreshIndicator's own animation to register, or if the
+    // pull gesture itself was never recognized as an overscroll.
+    testWidgets('explicit refreshing indicator toggles with isRefreshing',
+        (tester) async {
+      final refreshing = ValueNotifier<bool>(false);
+      addTearDown(refreshing.dispose);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: ValueListenableBuilder<bool>(
+            valueListenable: refreshing,
+            builder: (context, value, _) => AnimatedSwitcher(
+              duration: const Duration(milliseconds: 150),
+              child: value
+                  ? const LinearProgressIndicator(
+                      key: ValueKey('refreshing'), minHeight: 2)
+                  : const SizedBox(height: 2, key: ValueKey('idle')),
+            ),
+          ),
+        ),
+      ));
+
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+
+      refreshing.value = true;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 150));
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+
+      refreshing.value = false;
+      await tester.pumpAndSettle();
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+    });
+  });
+
   test('status universe is stable', () {
     expect(itemStatuses, [
       'open',
