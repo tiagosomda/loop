@@ -115,7 +115,8 @@ def _upload_attachment(item_id: str, msg_id: str, path: Path) -> dict:
 def post_message(item_id: str, text: str, author: str = "agent",
                  attachments: list[str] | None = None) -> str:
     item_ref = _items().document(item_id)
-    if not item_ref.get().exists:
+    snapshot = item_ref.get()
+    if not snapshot.exists:
         raise SystemExit(f"item {item_id} not found")
     msg_id = uuid.uuid4().hex[:20]
     uploaded = [
@@ -128,10 +129,18 @@ def post_message(item_id: str, text: str, author: str = "agent",
         "attachments": uploaded,
         "createdAt": firestore.SERVER_TIMESTAMP,
     })
-    item_ref.update({
+    updates = {
         "messageCount": firestore.firestore.Increment(1),
         "updatedAt": firestore.SERVER_TIMESTAMP,
-    })
+    }
+    # A user reply re-queues an item the agent handed back (needs-review /
+    # completed) so the next run picks it up; closed stays closed.
+    if author == "user" and (snapshot.to_dict() or {}).get("status") in (
+        "needs-review",
+        "completed",
+    ):
+        updates["status"] = "open"
+    item_ref.update(updates)
     return msg_id
 
 

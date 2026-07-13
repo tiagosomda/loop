@@ -109,10 +109,20 @@ class BoardService {
       'attachments': [for (final a in uploaded) a.toMap()],
       'createdAt': FieldValue.serverTimestamp(),
     });
-    await _items.doc(itemId).update({
+    final updates = <String, dynamic>{
       'messageCount': FieldValue.increment(1),
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    };
+    // A user reply re-queues an item the agent had handed back: bump it out of
+    // needs-review/completed so the next scheduled run picks it up again.
+    // (closed is terminal — the user reopens that one deliberately.)
+    if (author == 'user') {
+      final current = (await _items.doc(itemId).get()).data()?['status'];
+      if (current == 'needs-review' || current == 'completed') {
+        updates['status'] = 'open';
+      }
+    }
+    await _items.doc(itemId).update(updates);
   }
 
   Future<String> downloadUrl(Attachment a) =>

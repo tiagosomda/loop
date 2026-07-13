@@ -39,6 +39,10 @@ $PY $CLI items list --status open,in-progress
    ```bash
    $PY $CLI items show <id>
    ```
+   If the thread already contains your earlier `agent` messages, this item was
+   reopened by a user reply. Treat the `user` messages posted **after your last
+   `agent` message** as the new request; the earlier exchange is background you
+   don't need to redo.
 3. Do the work in the item's repo under `dev/`, using best-practice agentic
    workflows: branch, implement, test, commit; open a PR when the repo has a
    remote workflow that fits.
