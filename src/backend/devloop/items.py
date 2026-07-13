@@ -35,6 +35,8 @@ def _summary(doc) -> dict:
         "updatedAt": _iso(data.get("updatedAt")),
         "lastAgentRunAt": _iso(data.get("lastAgentRunAt")),
         "messageCount": data.get("messageCount", 0),
+        "archived": bool(data.get("archived", False)),
+        "archivedAt": _iso(data.get("archivedAt")),
     }
 
 
@@ -42,12 +44,20 @@ def _iso(value):
     return value.isoformat() if isinstance(value, datetime) else value
 
 
-def list_items(statuses: list[str] | None) -> list[dict]:
+def list_items(statuses: list[str] | None,
+               include_archived: bool = False) -> list[dict]:
     query = _items()
     if statuses:
         query = query.where(filter=firestore.firestore.FieldFilter("status", "in", statuses))
+    # Archived filtering is applied client-side: existing docs predate the
+    # `archived` field, and a Firestore `archived == False` filter would skip
+    # those documents entirely.
     items = sorted(
-        (_summary(doc) for doc in query.stream()),
+        (
+            summary
+            for doc in query.stream()
+            if (summary := _summary(doc))["archived"] is False or include_archived
+        ),
         key=lambda item: item.get("updatedAt") or "",
         reverse=True,
     )
@@ -56,6 +66,7 @@ def list_items(statuses: list[str] | None) -> list[dict]:
     cache = {
         "fetchedAt": datetime.now(timezone.utc).isoformat(),
         "statuses": statuses,
+        "includeArchived": include_archived,
         "items": items,
     }
     (config.DATA_DIR / "board-cache.json").write_text(json.dumps(cache, indent=2))
@@ -75,6 +86,8 @@ def create_item(title: str, repo_id: str, text: str | None, model: str | None,
         "updatedAt": firestore.SERVER_TIMESTAMP,
         "lastAgentRunAt": None,
         "messageCount": 0,
+        "archived": False,
+        "archivedAt": None,
     })
     if text:
         post_message(ref.id, text, author="user")
@@ -97,6 +110,40 @@ def set_status(item_id: str, status: str) -> None:
         "status": status,
         "updatedAt": firestore.SERVER_TIMESTAMP,
     })
+
+
+def archive_item(item_id: str) -> None:
+    """Hide an item from the default board without changing its status."""
+    _items().document(item_id).update({
+        "archived": True,
+        "archivedAt": firestore.SERVER_TIMESTAMP,
+        "updatedAt": firestore.SERVER_TIMESTAMP,
+    })
+
+
+def unarchive_item(item_id: str) -> None:
+    _items().document(item_id).update({
+        "archived": False,
+        "archivedAt": None,
+        "updatedAt": firestore.SERVER_TIMESTAMP,
+    })
+
+
+def archive_completed() -> list[str]:
+    """Archive every non-archived item currently in the `completed` status.
+
+    Returns the ids that were archived (skips ones already archived).
+    """
+    query = _items().where(
+        filter=firestore.firestore.FieldFilter("status", "in", ["completed"])
+    )
+    archived: list[str] = []
+    for doc in query.stream():
+        if (doc.to_dict() or {}).get("archived"):
+            continue
+        archive_item(doc.id)
+        archived.append(doc.id)
+    return archived
 
 
 def _upload_attachment(item_id: str, msg_id: str, path: Path) -> dict:

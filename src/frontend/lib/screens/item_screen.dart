@@ -39,6 +39,7 @@ class _ItemScreenState extends State<ItemScreen> {
             titleTextStyle: Theme.of(context).textTheme.titleMedium,
             title: Text(item?.title ?? '…'),
             actions: [
+              if (item != null) _ArchiveButton(item: item),
               if (item != null) _RepoLinkButton(repoId: item.repoId),
               const SizedBox(width: 8),
             ],
@@ -315,6 +316,37 @@ class _StatusPill extends StatelessWidget {
           ),
       ],
       child: StatusChip(status: item.status),
+    );
+  }
+}
+
+/// App-bar toggle to archive/unarchive this single item. Archiving hides it
+/// from the default board without touching its status.
+class _ArchiveButton extends StatelessWidget {
+  const _ArchiveButton({required this.item});
+
+  final ActionItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final board = context.read<BoardService>();
+    return IconButton(
+      tooltip: item.archived ? 'Unarchive' : 'Archive',
+      icon: Icon(item.archived
+          ? Icons.unarchive_outlined
+          : Icons.archive_outlined),
+      onPressed: () async {
+        final messenger = ScaffoldMessenger.of(context);
+        if (item.archived) {
+          await board.unarchiveItem(item.id);
+          messenger.showSnackBar(
+              const SnackBar(content: Text('Item unarchived')));
+        } else {
+          await board.archiveItem(item.id);
+          messenger.showSnackBar(
+              const SnackBar(content: Text('Item archived')));
+        }
+      },
     );
   }
 }

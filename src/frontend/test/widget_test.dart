@@ -13,6 +13,42 @@ void main() {
     ]);
   });
 
+  group('archived view filtering', () {
+    ActionItem item({required bool archived}) => ActionItem(
+          id: 'x',
+          title: 't',
+          repoId: 'r',
+          status: 'completed',
+          archived: archived,
+        );
+
+    test('default view shows only non-archived items', () {
+      expect(
+        matchesArchivedView(item(archived: false), showArchived: false),
+        isTrue,
+      );
+      expect(
+        matchesArchivedView(item(archived: true), showArchived: false),
+        isFalse,
+      );
+    });
+
+    test('archived view shows only archived items', () {
+      expect(
+        matchesArchivedView(item(archived: true), showArchived: true),
+        isTrue,
+      );
+      expect(
+        matchesArchivedView(item(archived: false), showArchived: true),
+        isFalse,
+      );
+    });
+
+    test('ActionItem defaults to not archived', () {
+      expect(item(archived: false).archived, isFalse);
+    });
+  });
+
   group('schedule-aware logo speed', () {
     test('accelerates inside the schedule window', () {
       final now = DateTime(2026, 7, 13, 10, 12, 1);

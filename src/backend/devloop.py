@@ -6,6 +6,9 @@ Examples:
     ./devloop.py items claim <id>
     ./devloop.py items post <id> --text "done, see PR" --attach shot.png
     ./devloop.py items status <id> needs-review
+    ./devloop.py items archive <id>            # archive one item
+    ./devloop.py items archive --completed     # bulk-archive completed items
+    ./devloop.py items unarchive <id>
     ./devloop.py repos crawl
     ./devloop.py schedule update --mark-run
     ./devloop.py rules pull && ./devloop.py rules merge && ./devloop.py rules deploy
@@ -33,6 +36,8 @@ def main(argv: list[str] | None = None) -> None:
 
     p = sub.add_parser("list", help="list items (writes data/board-cache.json)")
     p.add_argument("--status", help="comma-separated statuses, e.g. open,in-progress")
+    p.add_argument("--include-archived", action="store_true",
+                   help="also include archived items (excluded by default)")
 
     p = sub.add_parser("show", help="print an item with its full thread")
     p.add_argument("id")
@@ -58,6 +63,15 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("status", help="set item status")
     p.add_argument("id")
     p.add_argument("status")
+
+    p = sub.add_parser("archive",
+                       help="archive an item by id, or all completed with --completed")
+    p.add_argument("id", nargs="?", help="item id (omit when using --completed)")
+    p.add_argument("--completed", action="store_true",
+                   help="bulk-archive every completed, non-archived item")
+
+    p = sub.add_parser("unarchive", help="restore an archived item to the board")
+    p.add_argument("id")
 
     p = sub.add_parser("post", help="append a message to an item's thread")
     p.add_argument("id")
@@ -106,7 +120,7 @@ def main(argv: list[str] | None = None) -> None:
         from devloop import items as mod
         if args.cmd == "list":
             statuses = args.status.split(",") if args.status else None
-            _print(mod.list_items(statuses))
+            _print(mod.list_items(statuses, include_archived=args.include_archived))
         elif args.cmd == "show":
             _print(mod.show_item(args.id, new_only=args.new))
         elif args.cmd == "fetch":
@@ -121,6 +135,18 @@ def main(argv: list[str] | None = None) -> None:
         elif args.cmd == "status":
             mod.set_status(args.id, args.status)
             print(f"{args.id} -> {args.status}")
+        elif args.cmd == "archive":
+            if args.completed:
+                ids = mod.archive_completed()
+                print(f"archived {len(ids)} completed item(s): {', '.join(ids) or '(none)'}")
+            elif args.id:
+                mod.archive_item(args.id)
+                print(f"{args.id} -> archived")
+            else:
+                raise SystemExit("pass an item id or --completed")
+        elif args.cmd == "unarchive":
+            mod.unarchive_item(args.id)
+            print(f"{args.id} -> unarchived")
         elif args.cmd == "post":
             msg_id = mod.post_message(args.id, args.text, args.author, args.attach)
             print(f"posted {msg_id}")

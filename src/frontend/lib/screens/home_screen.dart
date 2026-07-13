@@ -34,6 +34,37 @@ class HomeScreen extends StatelessWidget {
             icon: const Icon(Icons.add),
             onPressed: () => openNewItemScreen(context),
           ),
+          IconButton(
+            tooltip: app.showArchived
+                ? 'Back to active board'
+                : 'View archived items',
+            icon: Icon(app.showArchived
+                ? Icons.unarchive_outlined
+                : Icons.archive_outlined),
+            onPressed: app.toggleShowArchived,
+          ),
+          if (!app.showArchived)
+            PopupMenuButton<String>(
+              tooltip: 'Board actions',
+              icon: const Icon(Icons.more_vert),
+              onSelected: (v) {
+                if (v == 'archive-completed') {
+                  _archiveCompleted(context, board);
+                }
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: 'archive-completed',
+                  child: Row(
+                    children: [
+                      Icon(Icons.archive_outlined, size: 18),
+                      SizedBox(width: 10),
+                      Text('Archive completed'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           const ThemeToggleButton(),
           IconButton(
             tooltip: 'Profile',
@@ -60,7 +91,7 @@ class HomeScreen extends StatelessWidget {
               _BoardControls(app: app),
               Expanded(
                 child: app.boardView == BoardView.list
-                    ? _ListView(items: items)
+                    ? _ListView(items: items, showArchived: app.showArchived)
                     : _KanbanView(items: items),
               ),
             ],
@@ -70,8 +101,47 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _archiveCompleted(
+      BuildContext context, BoardService board) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Archive completed items'),
+        content: const Text(
+          'Archive every item currently marked completed? They stay searchable '
+          'in the archived view and can be restored anytime.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Archive'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final n = await board.archiveCompleted();
+      messenger.showSnackBar(SnackBar(
+        content: Text(n == 0
+            ? 'No completed items to archive'
+            : 'Archived $n completed item${n == 1 ? '' : 's'}'),
+      ));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Failed to archive: $e')));
+    }
+  }
+
   List<ActionItem> _filtered(List<ActionItem> items, AppState app) {
     var result = items.where((i) {
+      // Archiving is orthogonal to status: hide archived items from the default
+      // board, and in the archived view show only archived ones.
+      if (!matchesArchivedView(i, showArchived: app.showArchived)) return false;
       if (app.statusFilter.isNotEmpty && !app.statusFilter.contains(i.status)) {
         return false;
       }
@@ -171,14 +241,19 @@ class _BoardControls extends StatelessWidget {
 }
 
 class _ListView extends StatelessWidget {
-  const _ListView({required this.items});
+  const _ListView({required this.items, this.showArchived = false});
 
   final List<ActionItem> items;
+  final bool showArchived;
 
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) {
-      return const Center(child: Text('No action items — add one with +'));
+      return Center(
+        child: Text(showArchived
+            ? 'No archived items'
+            : 'No action items — add one with +'),
+      );
     }
     return ListView.builder(
       padding: const EdgeInsets.only(top: 4, bottom: 24),

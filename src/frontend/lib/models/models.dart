@@ -24,6 +24,8 @@ class ActionItem {
   final DateTime? updatedAt;
   final DateTime? lastAgentRunAt;
   final int messageCount;
+  final bool archived;
+  final DateTime? archivedAt;
 
   ActionItem({
     required this.id,
@@ -36,6 +38,8 @@ class ActionItem {
     this.updatedAt,
     this.lastAgentRunAt,
     this.messageCount = 0,
+    this.archived = false,
+    this.archivedAt,
   });
 
   factory ActionItem.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -51,9 +55,17 @@ class ActionItem {
       updatedAt: _ts(d['updatedAt']),
       lastAgentRunAt: _ts(d['lastAgentRunAt']),
       messageCount: (d['messageCount'] ?? 0) as int,
+      archived: d['archived'] == true,
+      archivedAt: _ts(d['archivedAt']),
     );
   }
 }
+
+/// Whether [item] belongs on the board for the current archived toggle:
+/// archived items only appear in the archived view, active items only in the
+/// default view. Archiving is orthogonal to `status`.
+bool matchesArchivedView(ActionItem item, {required bool showArchived}) =>
+    item.archived == showArchived;
 
 class Attachment {
   final String name;

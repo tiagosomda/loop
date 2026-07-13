@@ -79,6 +79,40 @@ class BoardService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
+  /// Archiving is an orthogonal flag to `status`: an archived item keeps its
+  /// status but drops out of the default board view.
+  Future<void> archiveItem(String itemId) => _items.doc(itemId).update({
+        'archived': true,
+        'archivedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+  Future<void> unarchiveItem(String itemId) => _items.doc(itemId).update({
+        'archived': false,
+        'archivedAt': null,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+  /// Archive every completed, not-yet-archived item in one batch. Returns the
+  /// number of items archived.
+  Future<int> archiveCompleted() async {
+    final snap =
+        await _items.where('status', isEqualTo: 'completed').get();
+    final batch = _db.batch();
+    var count = 0;
+    for (final doc in snap.docs) {
+      if (doc.data()['archived'] == true) continue;
+      batch.update(doc.reference, {
+        'archived': true,
+        'archivedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      count++;
+    }
+    if (count > 0) await batch.commit();
+    return count;
+  }
+
   Future<void> setModelEffort(String itemId,
           {String? model, String? effortLevel}) =>
       _items.doc(itemId).update({

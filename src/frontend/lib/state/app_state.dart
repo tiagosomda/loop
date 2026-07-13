@@ -24,6 +24,9 @@ class AppState extends ChangeNotifier {
   final Set<String> statusFilter = {};
   String? repoFilter;
   String sortBy = 'updated'; // updated | created | title
+  // When true the board shows only archived items; otherwise archived items
+  // are hidden from the default view.
+  bool showArchived = false;
 
   bool get signedIn => user != null;
   bool get authorized => user?.email == authorizedEmail;
@@ -68,6 +71,11 @@ class AppState extends ChangeNotifier {
     statusFilter.contains(status)
         ? statusFilter.remove(status)
         : statusFilter.add(status);
+    notifyListeners();
+  }
+
+  void toggleShowArchived() {
+    showArchived = !showArchived;
     notifyListeners();
   }
 
