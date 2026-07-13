@@ -91,8 +91,12 @@ class HomeScreen extends StatelessWidget {
               _BoardControls(app: app),
               Expanded(
                 child: app.boardView == BoardView.list
-                    ? _ListView(items: items, showArchived: app.showArchived)
-                    : _KanbanView(items: items),
+                    ? _ListView(
+                        items: items,
+                        showArchived: app.showArchived,
+                        onRefresh: board.refresh,
+                      )
+                    : _KanbanView(items: items, onRefresh: board.refresh),
               ),
             ],
           );
@@ -241,35 +245,55 @@ class _BoardControls extends StatelessWidget {
 }
 
 class _ListView extends StatelessWidget {
-  const _ListView({required this.items, this.showArchived = false});
+  const _ListView({
+    required this.items,
+    required this.onRefresh,
+    this.showArchived = false,
+  });
 
   final List<ActionItem> items;
+  final Future<void> Function() onRefresh;
   final bool showArchived;
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return Center(
-        child: Text(showArchived
-            ? 'No archived items'
-            : 'No action items — add one with +'),
-      );
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.only(top: 4, bottom: 24),
-      itemCount: items.length,
-      itemBuilder: (context, i) => ItemCard(
-        item: items[i],
-        onTap: () => openItem(context, items[i].id),
-      ),
+    // Wrap in a RefreshIndicator so the primary board supports pull-to-refresh.
+    // AlwaysScrollableScrollPhysics keeps the pull gesture working even when the
+    // list is short or empty, so the empty state can be refreshed too.
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: items.isEmpty
+          ? ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 96),
+                  child: Center(
+                    child: Text(showArchived
+                        ? 'No archived items'
+                        : 'No action items — add one with +'),
+                  ),
+                ),
+              ],
+            )
+          : ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(top: 4, bottom: 24),
+              itemCount: items.length,
+              itemBuilder: (context, i) => ItemCard(
+                item: items[i],
+                onTap: () => openItem(context, items[i].id),
+              ),
+            ),
     );
   }
 }
 
 class _KanbanView extends StatelessWidget {
-  const _KanbanView({required this.items});
+  const _KanbanView({required this.items, required this.onRefresh});
 
   final List<ActionItem> items;
+  final Future<void> Function() onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -313,16 +337,24 @@ class _KanbanView extends StatelessWidget {
                   ),
                 ),
                 Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    children: [
-                      for (final item
-                          in items.where((i) => i.status == status))
-                        ItemCard(
-                          item: item,
-                          onTap: () => openItem(context, item.id),
-                        ),
-                    ],
+                  // The outer kanban list scrolls horizontally, so a vertical
+                  // pull-to-refresh has to live on each column's own vertical
+                  // list. AlwaysScrollableScrollPhysics keeps the gesture live
+                  // even for short/empty columns.
+                  child: RefreshIndicator(
+                    onRefresh: onRefresh,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.only(bottom: 8),
+                      children: [
+                        for (final item
+                            in items.where((i) => i.status == status))
+                          ItemCard(
+                            item: item,
+                            onTap: () => openItem(context, item.id),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ],

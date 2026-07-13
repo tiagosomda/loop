@@ -23,6 +23,17 @@ class BoardService {
       .snapshots()
       .map((s) => [for (final d in s.docs) ActionItem.fromDoc(d)]);
 
+  /// Forces a one-off fetch of the board items straight from the server,
+  /// bypassing Firestore's local cache. The live [items] stream already keeps
+  /// the board current, so this exists purely to back the pull-to-refresh
+  /// affordance — it re-primes the snapshot after being offline/backgrounded
+  /// and lets the callback await a real server round-trip.
+  Future<void> refresh() async {
+    await _items
+        .orderBy('updatedAt', descending: true)
+        .get(const GetOptions(source: Source.server));
+  }
+
   Stream<ActionItem?> item(String id) => _items
       .doc(id)
       .snapshots()
