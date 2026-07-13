@@ -236,7 +236,10 @@ class BoardService {
   /// never touch any document but the one moved.
   static const _orderGap = 1000.0;
 
-  /// Applies a drag-and-drop move reported by a `ReorderableListView`.
+  /// Applies a drag-and-drop move reported by a `ReorderableListView`'s
+  /// `onReorderItem` (not the deprecated `onReorder` — `newIndex` here is
+  /// already adjusted for the removed item at `oldIndex`, so no manual
+  /// `-1` correction is needed before inserting).
   ///
   /// [displayed] is the list exactly as shown to the user *for the scope
   /// being reordered* (the flat list view, or a single kanban column) —
@@ -265,7 +268,7 @@ class BoardService {
   }) async {
     final list = [...displayed];
     final moved = list.removeAt(oldIndex);
-    final insertAt = oldIndex < newIndex ? newIndex - 1 : newIndex;
+    final insertAt = newIndex;
     list.insert(insertAt, moved);
 
     final before = insertAt > 0 ? effectiveOrder(list[insertAt - 1]) : null;

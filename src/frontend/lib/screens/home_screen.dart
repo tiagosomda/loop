@@ -331,7 +331,7 @@ class _ListView extends StatelessWidget {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.only(top: 4, bottom: 24),
                   itemCount: items.length,
-                  onReorder: onReorder,
+                  onReorderItem: onReorder,
                   proxyDecorator: dragProxyDecorator,
                   itemBuilder: (context, i) => ItemCard(
                     key: ValueKey(items[i].id),
@@ -415,7 +415,7 @@ class _KanbanView extends StatelessWidget {
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.only(bottom: 8),
                         itemCount: column.length,
-                        onReorder: (i, j) => onReorder(column, i, j),
+                        onReorderItem: (i, j) => onReorder(column, i, j),
                         proxyDecorator: dragProxyDecorator,
                         itemBuilder: (context, i) => ItemCard(
                           key: ValueKey(column[i].id),

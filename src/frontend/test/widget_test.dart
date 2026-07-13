@@ -28,7 +28,7 @@ void main() {
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.only(top: 4, bottom: 24),
               itemCount: 5,
-              onReorder: (a, b) {},
+              onReorderItem: (a, b) {},
               itemBuilder: (context, i) => Card(
                 key: ValueKey(i),
                 child: InkWell(
