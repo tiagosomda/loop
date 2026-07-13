@@ -7,7 +7,7 @@ to the board. See [docs/design.md](docs/design.md).
 
 ## Layout
 
-- `src/frontend` — Flutter web board UI, deployed to <https://tiago.dev/dev-loop>
+- `src/frontend` — Flutter web board UI, deployed to <https://tiago.dev/loop>
 - `src/backend` — Python CLI for board I/O, repo crawling, and Firestore rules management
 - `docs/` — design + the scheduled agent's runbook
 - `data/` — local cache/scratch (gitignored)

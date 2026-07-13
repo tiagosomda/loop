@@ -46,7 +46,7 @@ jobs:
         working-directory: src/frontend
 
       - name: Build Web
-        run: flutter build web --base-href "/dev-loop/"
+        run: flutter build web --base-href "/loop/"
         working-directory: src/frontend
 
       - name: Setup Pages

@@ -13,7 +13,7 @@ user reviews the results and has the final call on closing items.
 ┌───────────────┐      writes items       ┌─────────────────────┐
 │  Web frontend │ ──────────────────────▶ │  Firestore board    │
 │ tiago.dev/    │ ◀────────────────────── │  /dev-loop/**       │
-│   dev-loop    │      reads status        └────────▲───────────┘
+│   loop        │      reads status        └────────▲───────────┘
 └───────────────┘                                   │ reads open items,
                                                     │ writes updates
                                           ┌─────────┴───────────┐
@@ -144,7 +144,7 @@ Service-account resolution order: `$DEV_LOOP_SERVICE_ACCOUNT` →
 ## Frontend (`src/frontend`)
 
 Flutter web (Dart), mobile-first, deployed via **GitHub Pages** to
-`tiago.dev/dev-loop` (the repo is a project page under the `tiago.dev`
+`tiago.dev/loop` (the repo is a project page under the `tiago.dev`
 github.io site — note: project-setup.md says "gitlab pages" but the repo and
 the tiago.dev domain live on GitHub; following match-chat's proven GitHub
 Pages workflow).
@@ -194,7 +194,7 @@ follow-system themes. Lean on Material 3 + established packages
 4. **Frontend** — Flutter app scaffold, Firebase wiring, theming, board
    (list + kanban + search/filter/sort), item detail thread with
    attachments, new-item flow, profile, logged-out landing.
-5. **Deploy** — GitHub Pages workflow (`--base-href /dev-loop/`).
+5. **Deploy** — GitHub Pages workflow (`--base-href /loop/`).
 6. **Agent loop** — `docs/agent-runbook.md` + Claude Code scheduled task at
    00:15/05:15/10:15/15:15/20:15; `schedule update` + `repos crawl` run at
    the end of setup and periodically thereafter.
