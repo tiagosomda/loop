@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../main.dart';
 import '../state/app_state.dart';
+import '../widgets/brand_logo.dart';
 
 class LoggedOutScreen extends StatelessWidget {
   const LoggedOutScreen({super.key});
@@ -11,13 +12,12 @@ class LoggedOutScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    final scheme = Theme.of(context).colorScheme;
     final wrongAccount = app.signedIn && !app.authorized;
 
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
-        title: const Text('DEV LOOP'),
+        title: const BrandTitle(),
         actions: [
           const ThemeToggleButton(),
           IconButton(
@@ -36,8 +36,7 @@ class LoggedOutScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.rocket_launch_outlined,
-                    size: 56, color: scheme.primary),
+                const DevLoopLogo(size: 88),
                 const SizedBox(height: 24),
                 Text(
                   wrongAccount

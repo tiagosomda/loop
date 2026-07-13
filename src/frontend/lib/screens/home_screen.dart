@@ -6,6 +6,7 @@ import '../models/models.dart';
 import '../services/board_service.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
+import '../widgets/brand_logo.dart';
 import '../widgets/widgets.dart';
 import 'item_screen.dart';
 import 'new_item_sheet.dart';
@@ -21,7 +22,12 @@ class HomeScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('DEV LOOP'),
+        title: StreamBuilder<ScheduleInfo>(
+          stream: board.schedule(),
+          builder: (context, snapshot) => BrandTitle(
+            scheduleTimes: snapshot.data?.times ?? const [],
+          ),
+        ),
         actions: [
           IconButton(
             tooltip: 'New action item',
