@@ -63,6 +63,20 @@ class BoardService {
   Stream<ScheduleInfo> schedule() =>
       _schedule.snapshots().map((d) => ScheduleInfo.fromMap(d.data()));
 
+  /// Order value that places a new item at the end of the manual order:
+  /// one gap-step past the current highest `order` (or fallback creation-time
+  /// position, for older items that predate manual ordering).
+  Future<double> _nextOrder() async {
+    final snap = await _items.get();
+    var top = 0.0;
+    for (final doc in snap.docs) {
+      final item = ActionItem.fromDoc(doc);
+      final value = effectiveOrder(item);
+      if (value > top) top = value;
+    }
+    return top + _orderGap;
+  }
+
   Future<String> createItem({
     required String title,
     required String repoId,
@@ -82,6 +96,7 @@ class BoardService {
       'updatedAt': FieldValue.serverTimestamp(),
       'lastAgentRunAt': null,
       'messageCount': 0,
+      'order': await _nextOrder(),
     });
     if (firstMessage != null && firstMessage.trim().isNotEmpty ||
         attachments.isNotEmpty) {
@@ -192,6 +207,145 @@ class BoardService {
       _storage.ref(a.storagePath).getDownloadURL();
 
   Future<void> clearRemovedRepo(String repoId) => _repos.doc(repoId).delete();
+
+  /// Gap between two adjacent items' `order` values. Reordering picks a
+  /// value halfway between the moved item's new neighbors, so most drags
+  /// never touch any document but the one moved.
+  static const _orderGap = 1000.0;
+
+  /// Applies a drag-and-drop move reported by a `ReorderableListView`.
+  ///
+  /// [displayed] is the list exactly as shown to the user *for the scope
+  /// being reordered* (the flat list view, or a single kanban column) —
+  /// already sorted by [effectiveOrder] — so [oldIndex]/[newIndex] line up
+  /// with Flutter's reporting. [allItems] is every active (non-archived)
+  /// item on the whole board, across every status, also sorted by
+  /// [effectiveOrder] — it's only consulted for the renumber fallback below,
+  /// to find the true board-wide neighbors bounding [displayed], since
+  /// `order` is one field shared by every view (the flat list *and* each
+  /// kanban column), not scoped to whatever subset is on screen.
+  ///
+  /// The moved item's new `order` is the midpoint between its new
+  /// neighbors' order values, so this only writes the one document in the
+  /// common case. If the neighbors are numerically adjacent (no room left
+  /// for a midpoint — only happens after many reorders land in the same
+  /// spot), [displayed] is renumbered with fresh, evenly-spaced values
+  /// strictly inside the gap bounded by its nearest board-wide neighbors —
+  /// never by resetting to small absolute indices, which would collide
+  /// with (or fall inside the range of) untouched items elsewhere on the
+  /// board that this drag never touched.
+  Future<void> reorderItem(
+    List<ActionItem> displayed,
+    int oldIndex,
+    int newIndex, {
+    required List<ActionItem> allItems,
+  }) async {
+    final list = [...displayed];
+    final moved = list.removeAt(oldIndex);
+    final insertAt = oldIndex < newIndex ? newIndex - 1 : newIndex;
+    list.insert(insertAt, moved);
+
+    final before = insertAt > 0 ? effectiveOrder(list[insertAt - 1]) : null;
+    final after =
+        insertAt < list.length - 1 ? effectiveOrder(list[insertAt + 1]) : null;
+
+    double newOrder;
+    if (before == null && after == null) {
+      newOrder = _orderGap;
+    } else if (before == null) {
+      newOrder = after! - _orderGap;
+    } else if (after == null) {
+      newOrder = before + _orderGap;
+    } else if (after - before > 1.0) {
+      newOrder = (before + after) / 2;
+    } else {
+      await _renumberWithinBounds(list, allItems);
+      return;
+    }
+    await _items.doc(moved.id).update({
+      'order': newOrder,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Renumbers [scope] (a subsequence of one status/column, already in its
+  /// intended new order) with fresh, evenly-spaced `order` values, strictly
+  /// bounded by the nearest board-wide items outside [scope] — i.e. items
+  /// of *other* statuses that this drag didn't touch. This never resets
+  /// [scope] to absolute indices like `(i+1)*1000`, since those would very
+  /// likely collide with (or land inside the range of) some other status's
+  /// existing values — new items and past renumbers both hand out order
+  /// values from that same small-integer-multiples-of-1000 sequence.
+  Future<void> _renumberWithinBounds(
+    List<ActionItem> scope,
+    List<ActionItem> allItems,
+  ) async {
+    final scopeIds = scope.map((i) => i.id).toSet();
+    final otherOrders = [
+      for (final i in allItems)
+        if (!scopeIds.contains(i.id)) effectiveOrder(i)
+    ];
+    final newOrders = renumberedOrders(
+      scopeOrders: [for (final i in scope) effectiveOrder(i)],
+      otherOrders: otherOrders,
+      gap: _orderGap,
+    );
+
+    final batch = _db.batch();
+    for (var i = 0; i < scope.length; i++) {
+      batch.update(_items.doc(scope[i].id), {
+        'order': newOrders[i],
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
+  }
+}
+
+/// Pure order-math for the renumber fallback, factored out of
+/// [BoardService] so it can be unit-tested without touching Firestore.
+///
+/// [scopeOrders] are the current [effectiveOrder] values of the items being
+/// renumbered, in their intended new sequence (index 0 = first). [otherOrders]
+/// are every *other* active item's [effectiveOrder] on the whole board — items
+/// of other statuses/columns that this drag didn't touch. Returns fresh,
+/// evenly-spaced values (same length and order as [scopeOrders]) strictly
+/// between the nearest bounding values in [otherOrders], so the result can
+/// never collide with or fall inside another status's untouched range. When
+/// there's no bounding neighbor on a side (the scope already sits at that
+/// extreme of the whole board), the bound extends past the scope's own
+/// current min/max instead of resetting to small absolute numbers.
+List<double> renumberedOrders({
+  required List<double> scopeOrders,
+  required List<double> otherOrders,
+  double gap = 1000.0,
+}) {
+  assert(scopeOrders.isNotEmpty);
+  final scopeMin = scopeOrders.reduce((a, b) => a < b ? a : b);
+  final scopeMax = scopeOrders.reduce((a, b) => a > b ? a : b);
+  final sortedOthers = [...otherOrders]..sort();
+
+  // The nearest other-status value at or below the scope's current range,
+  // and the nearest one at or above it — the two real neighbors this
+  // renumber must not collide with or cross.
+  double? before;
+  double? after;
+  for (final v in sortedOthers) {
+    if (v <= scopeMin) {
+      before = v;
+    } else if (after == null && v >= scopeMax) {
+      after = v;
+    }
+  }
+
+  final span = gap * (scopeOrders.length + 1);
+  final lowerBound = before ?? (scopeMin - span);
+  final upperBound = after ?? (scopeMax + span);
+
+  final step = (upperBound - lowerBound) / (scopeOrders.length + 1);
+  return [
+    for (var i = 0; i < scopeOrders.length; i++) lowerBound + step * (i + 1),
+  ];
 }
 
 class PendingAttachment {

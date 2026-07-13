@@ -26,6 +26,7 @@ class ActionItem {
   final int messageCount;
   final bool archived;
   final DateTime? archivedAt;
+  final double? order;
 
   ActionItem({
     required this.id,
@@ -40,6 +41,7 @@ class ActionItem {
     this.messageCount = 0,
     this.archived = false,
     this.archivedAt,
+    this.order,
   });
 
   factory ActionItem.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -57,6 +59,7 @@ class ActionItem {
       messageCount: (d['messageCount'] ?? 0) as int,
       archived: d['archived'] == true,
       archivedAt: _ts(d['archivedAt']),
+      order: (d['order'] as num?)?.toDouble(),
     );
   }
 }
@@ -66,6 +69,14 @@ class ActionItem {
 /// default view. Archiving is orthogonal to `status`.
 bool matchesArchivedView(ActionItem item, {required bool showArchived}) =>
     item.archived == showArchived;
+
+/// The manual board position to sort by: the explicit `order` field once an
+/// item has been dragged (or created after this feature shipped), falling
+/// back to creation time for older items that predate manual ordering so
+/// they still render in a stable, sensible position until someone drags
+/// them.
+double effectiveOrder(ActionItem item) =>
+    item.order ?? (item.createdAt?.millisecondsSinceEpoch.toDouble() ?? 0);
 
 class Attachment {
   final String name;

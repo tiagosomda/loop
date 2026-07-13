@@ -17,8 +17,8 @@ $PY $CLI run start    # mark-run (logs "run started") + repos crawl + ordered qu
 ```
 
 `run start` returns `{"repos": {...}, "queue": [...items...]}` — the queue is
-already ordered in-progress-before-open, oldest `updatedAt` first (section 2's
-ordering rule), so you don't need to re-derive it by hand.
+already ordered in-progress-before-open, then by the board's manual order
+(section 2's ordering rule), so you don't need to re-derive it by hand.
 
 **Run log** (`data/agent-runs.log`): every run must leave a trace, and the
 mechanics of that are scripted so the trace can't be skipped by forgetting a
@@ -50,8 +50,13 @@ items (`run stale <id>`, section 2).
   including the first — call `run next` and act on whatever it returns
   (or `null` if the queue is empty) rather than working through the
   snapshot from step 1. `run next` re-queries Firestore and applies the same
-  in-progress-before-open, oldest-`updatedAt`-first ordering every time, so
-  there's nothing to re-derive by hand.
+  in-progress-before-open, then-manual-order ordering every time, so
+  there's nothing to re-derive by hand. Manual order is the position the
+  user drags items to on the board (list view or within a kanban column) —
+  "what you see is what runs next." Items that predate manual ordering (no
+  `order` field, never dragged) interleave among explicitly-ordered items by
+  creation time, so they keep whatever relative position they'd visually
+  have on the board rather than being bucketed to the back of the queue.
 - For each `in-progress` item: it was claimed by a previous run that likely
   timed out. Run `run stale <id>` — it checks `lastAgentRunAt` and looks in
   the item's repo for a `devloop/<id>-*` branch or worktree, reporting commits
@@ -148,8 +153,8 @@ for their own sake.
 
 Runs share the user's Claude subscription, so treat capacity as finite, but
 there is no fixed item-count cap — work through every `open`/`in-progress`
-item in the queue, in-progress before open and oldest `updatedAt` first,
-re-fetching per section 2 as you go:
+item in the queue, in-progress before open and then by the board's manual
+order, re-fetching per section 2 as you go:
 
 - Finish items **one at a time** (post results + set status before starting
   the next) so hitting a limit mid-run never strands more than one item.

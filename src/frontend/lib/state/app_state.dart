@@ -23,7 +23,6 @@ class AppState extends ChangeNotifier {
   String search = '';
   final Set<String> statusFilter = {};
   String? repoFilter;
-  String sortBy = 'updated'; // updated | created | title
   // When true the board shows only archived items; otherwise archived items
   // are hidden from the default view.
   bool showArchived = false;
@@ -81,11 +80,6 @@ class AppState extends ChangeNotifier {
 
   void setRepoFilter(String? repoId) {
     repoFilter = repoId;
-    notifyListeners();
-  }
-
-  void setSortBy(String value) {
-    sortBy = value;
     notifyListeners();
   }
 

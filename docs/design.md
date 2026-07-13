@@ -71,7 +71,7 @@ with the other projects (match-chat, etc.). Access is hardcoded to
 ```
 dev-loop/app                                   root doc (app metadata)
 dev-loop/app/items/{itemId}                    action-item summary docs
-    title, repoId, status, model, effortLevel,
+    title, repoId, status, model, effortLevel, order (manual board position),
     createdAt, updatedAt, lastAgentRunAt, messageCount
 dev-loop/app/items/{itemId}/messages/{msgId}   thread messages (own docs)
     author ("user" | "agent"), text,
@@ -130,6 +130,7 @@ point, `devloop.py`, with subcommands:
 | `items list [--status open,in-progress]` | List summary docs (agent's first step; also writes a cache snapshot to `data/`) |
 | `items claim <id>` | Set `in-progress` + `lastAgentRunAt` (call before working) |
 | `items status <id> <status>` | Update status |
+| `items reorder <id> <value>` | Set an item's manual board position (`order` field) — the frontend's drag-to-reorder writes gap-based values; this is the CLI escape hatch |
 | `items post <id> --text ... [--attach file]...` | Append an agent message to the thread, uploading attachments to Storage |
 | `items create --title ... --repo ...` | Create a new item (handy for testing) |
 | `repos crawl` | Walk `dev/` for git repos → upsert into Firestore; repos no longer found are marked `removed` (hidden from the new-item picker, visible in profile until the user clears them) |
@@ -161,8 +162,11 @@ follow-system themes. Lean on Material 3 + established packages
 - **Board (home)**: header with "dev loop" on the left; right side: **+**
   (new item), theme toggle, profile button.
   - **List view** and **kanban view** (columns per status), toggleable.
-  - Search field + status/repo filters + sorting (last modified, created,
-    title) to find things fast.
+  - Search field + status/repo filters to find things fast.
+  - Manual drag-to-reorder (list view, and within each kanban column) sets
+    the board's order — this is also the order the scheduled agent picks
+    items up in (see `run.py`'s queue), so there's no separate "sort by"
+    control.
   - Item cards show brief info: title, repo, status, last modified.
 - **New item**: dialog/sheet — title, repo picker (active repos only),
   optional model + effort level, first message with attachments.

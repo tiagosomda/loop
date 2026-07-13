@@ -37,6 +37,9 @@ def _summary(doc) -> dict:
         "messageCount": data.get("messageCount", 0),
         "archived": bool(data.get("archived", False)),
         "archivedAt": _iso(data.get("archivedAt")),
+        # Manual board position (see run.py's queue ordering). None for items
+        # created before this field existed and never dragged since.
+        "order": data.get("order"),
     }
 
 
@@ -73,6 +76,58 @@ def list_items(statuses: list[str] | None,
     return items
 
 
+_ORDER_GAP = 1000.0
+
+
+def _effective_order_raw(data: dict) -> float:
+    """The manual-order sort key for a *raw* Firestore item doc (a plain
+    `doc.to_dict()`, where `createdAt` is still a `datetime`): its explicit
+    `order` field, or (for items that predate manual ordering and were
+    never dragged) its creation time, so legacy items keep a stable
+    relative position until someone reorders them. Used internally by
+    `_next_order`. For summary-shaped dicts (`_summary()`'s ISO-string
+    timestamps — what `run.py`'s queue works with), see `effective_order`
+    below; it applies the same rule but parses the ISO string instead."""
+    order = data.get("order")
+    if order is not None:
+        return order
+    created = data.get("createdAt")
+    return created.timestamp() * 1000 if isinstance(created, datetime) else 0.0
+
+
+def effective_order(item: dict) -> float:
+    """The manual-order sort key for a *summary* dict (as returned by
+    `_summary()`/`list_items()` — `createdAt` is an ISO string or None):
+    the item's explicit `order`, or its creation time as epoch
+    milliseconds. This mirrors the frontend's `effectiveOrder()` in
+    models.dart exactly, so an item that predates manual ordering
+    interleaves by age among explicitly-ordered items in both the board
+    display and the scheduled agent's pickup queue — "what you see on the
+    board is what runs next" holds for legacy items too, not just ones
+    that have been dragged."""
+    order = item.get("order")
+    if order is not None:
+        return order
+    created = item.get("createdAt")
+    if not created:
+        return 0.0
+    try:
+        return datetime.fromisoformat(created).timestamp() * 1000
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _next_order() -> float:
+    """One gap-step past the current highest manual-order position, so a
+    new item lands at the end of the board (and the pickup queue)."""
+    top = 0.0
+    for doc in _items().stream():
+        value = _effective_order_raw(doc.to_dict() or {})
+        if value > top:
+            top = value
+    return top + _ORDER_GAP
+
+
 def create_item(title: str, repo_id: str, text: str | None, model: str | None,
                 effort: str | None) -> str:
     ref = _items().document()
@@ -88,10 +143,21 @@ def create_item(title: str, repo_id: str, text: str | None, model: str | None,
         "messageCount": 0,
         "archived": False,
         "archivedAt": None,
+        "order": _next_order(),
     })
     if text:
         post_message(ref.id, text, author="user")
     return ref.id
+
+
+def set_order(item_id: str, order: float) -> None:
+    """Directly set an item's manual-order position. The frontend computes
+    gap-based values from drag-and-drop neighbors; this is the plain CLI
+    escape hatch for setting it headlessly (testing, scripting)."""
+    _items().document(item_id).update({
+        "order": order,
+        "updatedAt": firestore.SERVER_TIMESTAMP,
+    })
 
 
 def claim_item(item_id: str) -> None:

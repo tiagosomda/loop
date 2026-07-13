@@ -86,6 +86,15 @@ class HomeScreen extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
           final items = _filtered(snap.data!, app);
+          // The renumber fallback needs the *whole* active board (every
+          // status, ignoring search/repo filters) to find the real
+          // neighbors bounding whatever subset is being reordered — a
+          // single kanban column or the filtered list are just subsets of
+          // this. See BoardService.reorderItem.
+          final allActive = [
+            for (final i in snap.data!)
+              if (!i.archived) i
+          ]..sort((a, b) => effectiveOrder(a).compareTo(effectiveOrder(b)));
           return Column(
             children: [
               _BoardControls(app: app),
@@ -95,8 +104,23 @@ class HomeScreen extends StatelessWidget {
                         items: items,
                         showArchived: app.showArchived,
                         onRefresh: board.refresh,
+                        onReorder: (i, j) => board.reorderItem(
+                          items,
+                          i,
+                          j,
+                          allItems: allActive,
+                        ),
                       )
-                    : _KanbanView(items: items, onRefresh: board.refresh),
+                    : _KanbanView(
+                        items: items,
+                        onRefresh: board.refresh,
+                        onReorder: (column, i, j) => board.reorderItem(
+                          column,
+                          i,
+                          j,
+                          allItems: allActive,
+                        ),
+                      ),
               ),
             ],
           );
@@ -158,12 +182,10 @@ class HomeScreen extends StatelessWidget {
       }
       return true;
     }).toList();
-    result.sort((a, b) => switch (app.sortBy) {
-          'created' => (b.createdAt ?? DateTime(0))
-              .compareTo(a.createdAt ?? DateTime(0)),
-          'title' => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
-          _ => (b.updatedAt ?? DateTime(0)).compareTo(a.updatedAt ?? DateTime(0)),
-        });
+    // Manual order is the only ordering now — no more sort-by-field menu.
+    // Items are picked up by the scheduled agent in this same order (see
+    // src/backend/devloop/run.py), so what you see here is what runs next.
+    result.sort((a, b) => effectiveOrder(a).compareTo(effectiveOrder(b)));
     return result;
   }
 }
@@ -204,16 +226,6 @@ class _BoardControls extends StatelessWidget {
                 ),
                 onPressed: app.cycleBoardView,
               ),
-              PopupMenuButton<String>(
-                tooltip: 'Sort',
-                icon: const Icon(Icons.sort),
-                onSelected: app.setSortBy,
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'updated', child: Text('Last modified')),
-                  PopupMenuItem(value: 'created', child: Text('Created')),
-                  PopupMenuItem(value: 'title', child: Text('Title')),
-                ],
-              ),
             ],
           ),
           const SizedBox(height: 6),
@@ -248,11 +260,13 @@ class _ListView extends StatelessWidget {
   const _ListView({
     required this.items,
     required this.onRefresh,
+    required this.onReorder,
     this.showArchived = false,
   });
 
   final List<ActionItem> items;
   final Future<void> Function() onRefresh;
+  final void Function(int oldIndex, int newIndex) onReorder;
   final bool showArchived;
 
   @override
@@ -278,24 +292,51 @@ class _ListView extends StatelessWidget {
                 ],
               ),
             )
-          : ListView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.only(top: 4, bottom: 24),
-              itemCount: items.length,
-              itemBuilder: (context, i) => ItemCard(
-                item: items[i],
-                onTap: () => openItem(context, items[i].id),
-              ),
-            ),
+          // Archived items are a static, no-fuss history — manual order only
+          // governs the active board (and, in turn, agent pickup order), so
+          // reordering is disabled here.
+          : showArchived
+              ? ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(top: 4, bottom: 24),
+                  itemCount: items.length,
+                  itemBuilder: (context, i) => ItemCard(
+                    item: items[i],
+                    onTap: () => openItem(context, items[i].id),
+                  ),
+                )
+              : ReorderableListView.builder(
+                  buildDefaultDragHandles: false,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(top: 4, bottom: 24),
+                  itemCount: items.length,
+                  onReorder: onReorder,
+                  proxyDecorator: dragProxyDecorator,
+                  itemBuilder: (context, i) => ItemCard(
+                    key: ValueKey(items[i].id),
+                    item: items[i],
+                    onTap: () => openItem(context, items[i].id),
+                    dragHandle: DragHandle(index: i),
+                  ),
+                ),
     );
   }
 }
 
 class _KanbanView extends StatelessWidget {
-  const _KanbanView({required this.items, required this.onRefresh});
+  const _KanbanView({
+    required this.items,
+    required this.onRefresh,
+    required this.onReorder,
+  });
 
   final List<ActionItem> items;
   final Future<void> Function() onRefresh;
+  // Manual order applies within each status column too — dragging a card up
+  // or down a column reorders it only among that column's items, so a card
+  // never has to be dragged across a full board to reach the right spot.
+  final void Function(List<ActionItem> column, int oldIndex, int newIndex)
+      onReorder;
 
   @override
   Widget build(BuildContext context) {
@@ -345,18 +386,24 @@ class _KanbanView extends StatelessWidget {
                   // even for short/empty columns.
                   child: RefreshIndicator(
                     onRefresh: onRefresh,
-                    child: ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.only(bottom: 8),
-                      children: [
-                        for (final item
-                            in items.where((i) => i.status == status))
-                          ItemCard(
-                            item: item,
-                            onTap: () => openItem(context, item.id),
-                          ),
-                      ],
-                    ),
+                    child: Builder(builder: (context) {
+                      final column =
+                          items.where((i) => i.status == status).toList();
+                      return ReorderableListView.builder(
+                        buildDefaultDragHandles: false,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.only(bottom: 8),
+                        itemCount: column.length,
+                        onReorder: (i, j) => onReorder(column, i, j),
+                        proxyDecorator: dragProxyDecorator,
+                        itemBuilder: (context, i) => ItemCard(
+                          key: ValueKey(column[i].id),
+                          item: column[i],
+                          onTap: () => openItem(context, column[i].id),
+                          dragHandle: DragHandle(index: i),
+                        ),
+                      );
+                    }),
                   ),
                 ),
               ],
@@ -370,5 +417,62 @@ class _KanbanView extends StatelessWidget {
 void openItem(BuildContext context, String itemId) {
   Navigator.of(context).push(
     MaterialPageRoute(builder: (_) => ItemScreen(itemId: itemId)),
+  );
+}
+
+/// Grab handle for manual reordering: a small grip glyph that only the
+/// handle itself starts a drag from, so the rest of the card stays tappable.
+class DragHandle extends StatelessWidget {
+  const DragHandle({super.key, required this.index});
+
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ReorderableDragStartListener(
+      index: index,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.grab,
+        child: Padding(
+          // Generous hit target — a bare icon is too small to grab reliably,
+          // especially on touch.
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+          child: Icon(
+            Icons.drag_indicator,
+            size: 20,
+            color: scheme.onSurface.withValues(alpha: 0.35),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Visual feedback for the card currently being dragged: lifted off the
+/// list with a cyan glow and a slight tilt, echoing the board's sci-fi
+/// accent color so a drag in progress reads as unmistakably different from
+/// a static card.
+Widget dragProxyDecorator(Widget child, int index, Animation<double> animation) {
+  return AnimatedBuilder(
+    animation: animation,
+    builder: (context, _) {
+      final t = Curves.easeOut.transform(animation.value);
+      final scheme = Theme.of(context).colorScheme;
+      return Transform.scale(
+        scale: 1 + 0.03 * t,
+        child: Transform.rotate(
+          angle: 0.01 * t,
+          child: Material(
+            color: Colors.transparent,
+            elevation: 12 * t,
+            shadowColor: scheme.primary.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(AppTheme.radius),
+            child: child,
+          ),
+        ),
+      );
+    },
+    child: child,
   );
 }

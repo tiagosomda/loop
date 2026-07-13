@@ -6,6 +6,7 @@ Examples:
     ./devloop.py items claim <id>
     ./devloop.py items post <id> --text "done, see PR" --attach shot.png
     ./devloop.py items status <id> needs-review
+    ./devloop.py items reorder <id> 1500        # set manual board position
     ./devloop.py items archive <id>            # archive one item
     ./devloop.py items archive --completed     # bulk-archive completed items
     ./devloop.py items unarchive <id>
@@ -67,6 +68,13 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("status", help="set item status")
     p.add_argument("id")
     p.add_argument("status")
+
+    p = sub.add_parser("reorder",
+                       help="set an item's manual board position (order field)")
+    p.add_argument("id")
+    p.add_argument("value", type=float,
+                   help="new order value (the frontend uses gap-based values; "
+                        "this sets it directly)")
 
     p = sub.add_parser("archive",
                        help="archive an item by id, or all completed with --completed")
@@ -149,6 +157,9 @@ def main(argv: list[str] | None = None) -> None:
         elif args.cmd == "status":
             mod.set_status(args.id, args.status)
             print(f"{args.id} -> {args.status}")
+        elif args.cmd == "reorder":
+            mod.set_order(args.id, args.value)
+            print(f"{args.id} -> order {args.value}")
         elif args.cmd == "archive":
             if args.completed:
                 ids = mod.archive_completed()

@@ -16,10 +16,23 @@ from . import config, items as items_mod, repos as repos_mod, runlog, schedule
 _QUEUE_STATUSES = ("in-progress", "open")
 
 
-def _order_key(item: dict) -> tuple[int, str]:
-    # in-progress before open; oldest updatedAt first within each group.
-    rank = 0 if item["status"] == "in-progress" else 1
-    return (rank, item.get("updatedAt") or "")
+def _order_key(item: dict) -> tuple:
+    # in-progress items are a prior run's timed-out claims, not manually
+    # ordered work — keep those first, oldest `updatedAt` first, so a stale
+    # claim from the oldest run gets resolved before newer ones.
+    if item["status"] == "in-progress":
+        return (0, item.get("updatedAt") or "")
+    # Within `open`, pickup order follows the board's manual `order` field
+    # (see docs/design.md / the frontend's drag-to-reorder) rather than
+    # `updatedAt` — "what you see on the board is what runs next". This
+    # uses the exact same fallback rule as the frontend's own sort
+    # (`items_mod.effective_order` / models.dart's `effectiveOrder`): an
+    # item that predates manual ordering (never dragged, `order` missing)
+    # interleaves by creation time among explicitly-ordered items, instead
+    # of being bucketed after all of them — the board and the queue must
+    # agree on where an unordered item sits, or "what you see is what runs
+    # next" breaks for exactly the items that need it least tested.
+    return (1, items_mod.effective_order(item))
 
 
 def queue() -> list[dict]:

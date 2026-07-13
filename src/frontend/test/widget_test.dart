@@ -1,4 +1,5 @@
 import 'package:dev_loop/models/models.dart';
+import 'package:dev_loop/services/board_service.dart';
 import 'package:dev_loop/widgets/brand_logo.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -46,6 +47,84 @@ void main() {
 
     test('ActionItem defaults to not archived', () {
       expect(item(archived: false).archived, isFalse);
+    });
+  });
+
+  group('manual board order', () {
+    test('explicit order field wins when present', () {
+      final item = ActionItem(
+        id: 'x',
+        title: 't',
+        repoId: 'r',
+        status: 'open',
+        order: 42,
+        createdAt: DateTime(2026, 1, 1),
+      );
+      expect(effectiveOrder(item), 42);
+    });
+
+    test('falls back to createdAt for items never manually ordered', () {
+      final created = DateTime(2026, 1, 1);
+      final item = ActionItem(
+        id: 'x',
+        title: 't',
+        repoId: 'r',
+        status: 'open',
+        createdAt: created,
+      );
+      expect(effectiveOrder(item), created.millisecondsSinceEpoch.toDouble());
+    });
+
+    test('falls back to 0 when neither order nor createdAt is set', () {
+      final item = ActionItem(id: 'x', title: 't', repoId: 'r', status: 'open');
+      expect(effectiveOrder(item), 0);
+    });
+  });
+
+  group('renumber fallback (cross-column collision fix)', () {
+    test('stays strictly inside the gap bounded by other-status neighbors', () {
+      // Reproduces the bug: a kanban column with two adjacent order values
+      // (no room for a midpoint) sits between two items of *other*
+      // statuses, at 50 and 500. A renumber must never produce a value
+      // that collides with, or falls outside, that [50, 500] gap.
+      final result = renumberedOrders(
+        scopeOrders: [100, 100.5, 101],
+        otherOrders: [50, 500],
+      );
+      expect(result.length, 3);
+      for (final v in result) {
+        expect(v > 50, isTrue, reason: '$v must be strictly above the lower neighbor');
+        expect(v < 500, isTrue, reason: '$v must be strictly below the upper neighbor');
+      }
+      // Order is preserved and none of the other board's values are reused.
+      expect(result[0] < result[1] && result[1] < result[2], isTrue);
+      expect(result.toSet().intersection({50, 500}), isEmpty);
+    });
+
+    test('never resets to small absolute indices that collide with untouched items', () {
+      // The original bug: renumbering reset a column to (i+1)*1000, which
+      // is exactly the value another untouched item might already hold
+      // (e.g. a fresh board's second-ever item). Assert the new values
+      // don't coincide with an unrelated item sitting at 1000, 2000, 3000.
+      final result = renumberedOrders(
+        scopeOrders: [1500, 1500.2, 1500.4],
+        otherOrders: [1000, 2000, 3000],
+      );
+      expect(result.any((v) => v == 1000 || v == 2000 || v == 3000), isFalse);
+      // 1000 < scope < 2000 in this scenario, so the fix should bound the
+      // renumber to that gap rather than spilling past 3000 or below 1000.
+      for (final v in result) {
+        expect(v > 1000 && v < 2000, isTrue);
+      }
+    });
+
+    test('extends past the board edge when there is no bounding neighbor', () {
+      final result = renumberedOrders(
+        scopeOrders: [10, 20],
+        otherOrders: [],
+      );
+      expect(result.length, 2);
+      expect(result[0] < result[1], isTrue);
     });
   });
 

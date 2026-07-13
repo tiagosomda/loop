@@ -50,10 +50,15 @@ String repoShortName(String repoId) =>
     repoId.split('__').isEmpty ? repoId : repoId.split('__').last;
 
 class ItemCard extends StatelessWidget {
-  const ItemCard({super.key, required this.item, required this.onTap});
+  const ItemCard({super.key, required this.item, required this.onTap, this.dragHandle});
 
   final ActionItem item;
   final VoidCallback onTap;
+
+  /// Drag handle for manual reordering (typically a
+  /// `ReorderableDragStartListener`-wrapped icon). Null when the card is
+  /// shown somewhere reordering doesn't apply (e.g. the archived view).
+  final Widget? dragHandle;
 
   @override
   Widget build(BuildContext context) {
@@ -69,6 +74,10 @@ class ItemCard extends StatelessWidget {
             children: [
               Row(
                 children: [
+                  if (dragHandle != null) ...[
+                    dragHandle!,
+                    const SizedBox(width: 4),
+                  ],
                   Expanded(
                     child: Text(
                       item.title,
