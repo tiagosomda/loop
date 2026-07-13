@@ -1,0 +1,30 @@
+# machine-specific symlink to the root of all projects
+/dev
+
+# local cache / scratch (keep the folder)
+/data/*
+!/data/.gitkeep
+
+# never commit credentials
+service-account.json
+*.serviceaccount.json
+
+# local setup notes (kept out of git on purpose)
+docs/project-setup.md
+
+# python
+__pycache__/
+*.pyc
+.venv/
+
+# flutter / dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+*.iml
+
+# editors / os
+.DS_Store
+.idea/
+.vscode/
