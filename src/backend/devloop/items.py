@@ -15,7 +15,7 @@ from pathlib import Path
 
 from firebase_admin import firestore
 
-from . import config, fs
+from . import config, fs, runlog
 
 
 def _items():
@@ -101,6 +101,7 @@ def claim_item(item_id: str) -> None:
         "lastAgentRunAt": firestore.SERVER_TIMESTAMP,
         "updatedAt": firestore.SERVER_TIMESTAMP,
     })
+    runlog.log(f"item {item_id} claimed")
 
 
 def set_status(item_id: str, status: str) -> None:
@@ -110,6 +111,7 @@ def set_status(item_id: str, status: str) -> None:
         "status": status,
         "updatedAt": firestore.SERVER_TIMESTAMP,
     })
+    runlog.log(f"item {item_id} -> {status}")
 
 
 def archive_item(item_id: str) -> None:

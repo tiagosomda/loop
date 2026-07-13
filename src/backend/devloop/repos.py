@@ -56,6 +56,12 @@ def _find_repos(root: Path) -> list[Path]:
     return found
 
 
+def get(repo_id: str) -> dict | None:
+    """Look up one repo's registry doc (path is relative to config.DEV_ROOT)."""
+    doc = fs.db().collection(config.REPOS).document(repo_id).get()
+    return doc.to_dict() if doc.exists else None
+
+
 def crawl() -> dict:
     root = config.DEV_ROOT.resolve()
     if not root.is_dir():

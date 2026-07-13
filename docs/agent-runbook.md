@@ -13,45 +13,51 @@ CLI=src/backend/devloop.py
 ## 1. Start of run
 
 ```bash
-$PY $CLI schedule update --mark-run    # also logs "run started" to the run log
-$PY $CLI repos crawl
-$PY $CLI items list --status open,in-progress
+$PY $CLI run start    # mark-run (logs "run started") + repos crawl + ordered queue
 ```
 
-**Run log** (`data/agent-runs.log`): every run must leave a trace. The
-mark-run above logs the start automatically; you log the rest:
+`run start` returns `{"repos": {...}, "queue": [...items...]}` — the queue is
+already ordered in-progress-before-open, oldest `updatedAt` first (section 2's
+ordering rule), so you don't need to re-derive it by hand.
 
-```bash
-$PY $CLI runlog add "item <id> -> needs-review (<one-line outcome>)"
-$PY $CLI runlog add "run finished: 3 items worked, queue empty"
-$PY $CLI runlog tail          # recent history when debugging
-```
+**Run log** (`data/agent-runs.log`): every run must leave a trace, and the
+mechanics of that are scripted so the trace can't be skipped by forgetting a
+step:
 
-Log an item line after finishing each item, a `run finished` line at the end
-(even when there was nothing to do — "run finished: no open items"), and a
-line for anything abnormal (rate limit, hand-off, failure). A scheduled slot
-with no "run started" line means the run never executed at all (e.g. the
-model was rate-limited before it could act); a "run started" with no
-"run finished" means it died mid-run — check for stale in-progress items.
+- `run start` logs "run started" automatically.
+- `items claim <id>` and `items status <id> <status>` each log their own
+  transition automatically (`item <id> claimed`, `item <id> -> <status>`) —
+  you don't call `runlog` for these.
+- `run end [--note "..."]` logs the "run finished" line. Without `--note` it
+  auto-summarizes which item ids were touched (claimed/status-changed) since
+  the last "run started" line; pass `--note` to describe something the
+  auto-summary can't capture (idle run, an intentional hand-off, an abnormal
+  stop). Call it once at the end of every run, even an idle one.
+- `runlog add "..."` still exists for anything else worth a trace mid-run
+  (an abnormal event as it happens — rate limit, hand-off, failure) —
+  `runlog tail` shows recent history when debugging.
+
+A scheduled slot with no "run started" line means the run never executed at
+all (e.g. the model was rate-limited before it could act); a "run started"
+with no "run finished" means it died mid-run — check for stale in-progress
+items (`run stale <id>`, section 2).
 
 ## 2. Triage
 
-- **Refresh before every pick, not just at the start of the run.** The list
-  from step 1 is a snapshot; the user can add a new item or reply to an
+- **Refresh before every pick, not just at the start of the run.** `run
+  start`'s queue is a snapshot; the user can add a new item or reply to an
   open thread while the run is in progress. Before claiming each item —
-  including the first — re-run `items list --status open,in-progress` and
-  fold in anything new using the same ordering rule below, rather than
-  working through a stale in-memory list.
-- **Work `in-progress` items before `open` ones.** An in-progress item was
-  claimed by a previous run that likely timed out mid-work — finishing it
-  first avoids stranding partial work and keeps the board truthful. Only once
-  the in-progress items are handled do you start on `open` items. Within each
-  of those two groups, go oldest `updatedAt` first.
+  including the first — call `run next` and act on whatever it returns
+  (or `null` if the queue is empty) rather than working through the
+  snapshot from step 1. `run next` re-queries Firestore and applies the same
+  in-progress-before-open, oldest-`updatedAt`-first ordering every time, so
+  there's nothing to re-derive by hand.
 - For each `in-progress` item: it was claimed by a previous run that likely
-  timed out. Check `lastAgentRunAt`; look in the item's repo (under `dev/`,
-  see the repo's `path` in the repos registry) for a work-in-progress branch,
-  uncommitted changes, or an open PR related to the item. Resume that work if
-  it exists; otherwise treat the item as fresh.
+  timed out. Run `run stale <id>` — it checks `lastAgentRunAt` and looks in
+  the item's repo for a `devloop/<id>-*` branch or worktree, reporting commits
+  ahead of the default branch and any uncommitted changes. That's mechanical
+  detection only; deciding whether to resume that work or start fresh is
+  still your call.
 - Group related items when it makes the work better/cheaper — but every item
   still gets its own status updates and thread messages.
 - Respect an item's `model` and `effortLevel` hints when spawning sub-work.
@@ -98,7 +104,8 @@ for their own sake.
 
 ## 4. Per item
 
-1. **Claim first** (before any work, so a timeout leaves a truthful state):
+1. **Claim first** (before any work, so a timeout leaves a truthful state).
+   This also logs `item <id> claimed`:
    ```bash
    $PY $CLI items claim <id>
    ```
@@ -128,7 +135,7 @@ for their own sake.
    ```bash
    $PY $CLI items post <id> --text "..." --attach path/to/file.png
    ```
-5. Set the final status:
+5. Set the final status (this also logs `item <id> -> <status>`):
    - `needs-review` — user input or review is required (default for code
      changes),
    - `completed` — done and verified, nothing for the user to decide.
@@ -163,4 +170,7 @@ re-fetching per section 2 as you go:
 
 - Make sure no item you touched is still `in-progress` unless you are
   intentionally handing it to the next run (say so in its thread).
+- Call `run end` (with `--note` if the default touched-items summary doesn't
+  fit — an idle run, a hand-off, an abnormal stop) so the run's log entry
+  always gets written, even if nothing else does.
 - Cache/state you want to persist between runs goes in `data/`.

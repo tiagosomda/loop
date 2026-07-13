@@ -11,6 +11,10 @@ Examples:
     ./devloop.py items unarchive <id>
     ./devloop.py repos crawl
     ./devloop.py schedule update --mark-run
+    ./devloop.py run start                     # mark-run + crawl + ordered queue
+    ./devloop.py run next                      # next item to claim, or null
+    ./devloop.py run stale <id>                 # look for a prior WIP branch/worktree
+    ./devloop.py run end --note "..."           # log "run finished: ..."
     ./devloop.py rules pull && ./devloop.py rules merge && ./devloop.py rules deploy
 """
 
@@ -100,6 +104,16 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("tail", help="show recent log lines")
     p.add_argument("-n", type=int, default=20)
 
+    # run (orchestration helpers: bootstrap, ordered queue, stale-item check)
+    run = top.add_parser("run", help="scheduled-run orchestration helpers")
+    sub = run.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("start", help="mark-run + repos crawl + ordered open/in-progress queue")
+    sub.add_parser("next", help="the single next item to claim, per triage order")
+    p = sub.add_parser("end", help='log "run finished: ..."')
+    p.add_argument("--note", help="override the auto-derived touched-items summary")
+    p = sub.add_parser("stale", help="check for a prior run's WIP branch/worktree")
+    p.add_argument("id")
+
     # rules
     rules = top.add_parser("rules", help="shared security-rules management")
     sub = rules.add_subparsers(dest="cmd", required=True)
@@ -156,6 +170,16 @@ def main(argv: list[str] | None = None) -> None:
     elif args.group == "schedule":
         from devloop import schedule as mod
         _print(mod.update(mark_run=args.mark_run))
+    elif args.group == "run":
+        from devloop import run as mod
+        if args.cmd == "start":
+            _print(mod.start())
+        elif args.cmd == "next":
+            _print(mod.next_item())
+        elif args.cmd == "end":
+            print(mod.end(note=args.note))
+        elif args.cmd == "stale":
+            _print(mod.check_stale(args.id))
     elif args.group == "runlog":
         from devloop import runlog as mod
         if args.cmd == "add":
