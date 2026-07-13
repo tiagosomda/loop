@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+
+      "Bash(src/backend/.venv/bin/python src/backend/devloop.py items:*)",
+      "Bash(src/backend/.venv/bin/python src/backend/devloop.py repos:*)",
+      "Bash(src/backend/.venv/bin/python src/backend/devloop.py schedule:*)",
+
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git switch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git fetch:*)",
+      "Bash(git pull:*)",
+      "Bash(git merge:*)",
+      "Bash(git stash:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git remote:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git worktree:*)",
+      "Bash(git tag:*)",
+      "Bash(git config:*)",
+      "Bash(git push:*)",
+
+      "Bash(gh pr:*)",
+      "Bash(gh issue:*)",
+      "Bash(gh repo view:*)",
+      "Bash(gh repo list:*)",
+
+      "Bash(flutter pub:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(flutter test:*)",
+      "Bash(flutter build:*)",
+      "Bash(dart pub:*)",
+      "Bash(dart analyze:*)",
+      "Bash(dart test:*)",
+      "Bash(dart format:*)",
+
+      "Bash(npm install:*)",
+      "Bash(npm ci:*)",
+      "Bash(npm run:*)",
+      "Bash(npm test:*)",
+
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)",
+      "Bash(pwd)",
+      "Bash(echo:*)",
+      "Bash(which:*)",
+      "Bash(wc:*)",
+      "Bash(diff:*)",
+      "Bash(tree:*)"
+    ],
+    "ask": [
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push --force-with-lease:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean:*)",
+      "Bash(rm:*)",
+      "Bash(sudo:*)",
+      "Bash(src/backend/.venv/bin/python src/backend/devloop.py rules:*)"
+    ]
+  }
+}
