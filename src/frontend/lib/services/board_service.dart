@@ -29,9 +29,14 @@ class BoardService {
   /// affordance — it re-primes the snapshot after being offline/backgrounded
   /// and lets the callback await a real server round-trip.
   Future<void> refresh() async {
-    await _items
-        .orderBy('updatedAt', descending: true)
-        .get(const GetOptions(source: Source.server));
+    try {
+      await _items
+          .orderBy('updatedAt', descending: true)
+          .get(const GetOptions(source: Source.server));
+    } catch (_) {
+      // Best-effort: the live [items] stream keeps the board current even
+      // if this forced server round-trip fails (e.g. while offline).
+    }
   }
 
   Stream<ActionItem?> item(String id) => _items

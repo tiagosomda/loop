@@ -263,18 +263,20 @@ class _ListView extends StatelessWidget {
     return RefreshIndicator(
       onRefresh: onRefresh,
       child: items.isEmpty
-          ? ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 96),
-                  child: Center(
-                    child: Text(showArchived
-                        ? 'No archived items'
-                        : 'No action items — add one with +'),
+          ? LayoutBuilder(
+              builder: (context, constraints) => ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Center(
+                      child: Text(showArchived
+                          ? 'No archived items'
+                          : 'No action items — add one with +'),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             )
           : ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
