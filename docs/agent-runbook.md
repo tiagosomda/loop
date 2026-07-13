@@ -23,7 +23,7 @@ mark-run above logs the start automatically; you log the rest:
 
 ```bash
 $PY $CLI runlog add "item <id> -> needs-review (<one-line outcome>)"
-$PY $CLI runlog add "run finished: 2 items worked, 1 left open"
+$PY $CLI runlog add "run finished: 3 items worked, queue empty"
 $PY $CLI runlog tail          # recent history when debugging
 ```
 
@@ -139,22 +139,25 @@ for their own sake.
 
 ## 5. Usage budget
 
-Runs share the user's Claude subscription, so treat capacity as finite:
+Runs share the user's Claude subscription, so treat capacity as finite, but
+there is no fixed item-count cap — work through every `open`/`in-progress`
+item in the queue, in-progress before open and oldest `updatedAt` first,
+re-fetching per section 2 as you go:
 
-- **Work at most 2 items per run**, in-progress items before open ones and
-  oldest `updatedAt` first within each group. Anything left simply stays for
-  the next run — that's normal, not a failure.
 - Finish items **one at a time** (post results + set status before starting
   the next) so hitting a limit mid-run never strands more than one item.
 - Match spend to the item's hints: for `effortLevel: low` or `model: haiku`
   items, delegate the work to a subagent on that cheaper model and keep your
-  own orchestration thin. The coordinator/implementer/reviewer split (section
-  3) costs more sub-agent calls per item than doing it all inline — that
-  overhead buys a smaller, more reliable coordinator context, not a smaller
-  total spend, so still cap it at two items per run.
-- If you notice rate-limit errors or the run getting cut short, stop starting
-  new work: post partial progress to the current item's thread, say it's an
-  intentional hand-off, leave it `in-progress`, and end the run cleanly.
+  own orchestration thin.
+- There is currently no way to check remaining subscription usage before or
+  during a run — Claude Code doesn't expose the relevant rate-limit headers
+  to hooks, scripts, or `--print` mode. Treat this as purely **reactive**:
+  if you notice actual rate-limit errors or the run getting cut short, stop
+  starting new work immediately, post partial progress to the current
+  item's thread as an intentional hand-off, leave it `in-progress`, log it
+  right away (section 1), and end the run cleanly. A scheduled slot that
+  produced no `run started` line at all was likely blocked before it could
+  even begin — the next run's triage will find the stranded item.
 
 ## 6. End of run
 
