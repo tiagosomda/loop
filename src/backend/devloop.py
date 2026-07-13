@@ -78,6 +78,14 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--mark-run", action="store_true",
                    help="also stamp lastRunAt (call at the start of an agent run)")
 
+    # runlog
+    runlog_p = top.add_parser("runlog", help="agent run log (data/agent-runs.log)")
+    sub = runlog_p.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("add", help="append a timestamped event line")
+    p.add_argument("message")
+    p = sub.add_parser("tail", help="show recent log lines")
+    p.add_argument("-n", type=int, default=20)
+
     # rules
     rules = top.add_parser("rules", help="shared security-rules management")
     sub = rules.add_subparsers(dest="cmd", required=True)
@@ -122,6 +130,12 @@ def main(argv: list[str] | None = None) -> None:
     elif args.group == "schedule":
         from devloop import schedule as mod
         _print(mod.update(mark_run=args.mark_run))
+    elif args.group == "runlog":
+        from devloop import runlog as mod
+        if args.cmd == "add":
+            print(mod.log(args.message))
+        elif args.cmd == "tail":
+            print("\n".join(mod.tail(args.n)) or "(empty)")
     elif args.group == "rules":
         from devloop import rules as mod
         if args.cmd == "pull":

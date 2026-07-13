@@ -13,10 +13,26 @@ CLI=src/backend/devloop.py
 ## 1. Start of run
 
 ```bash
-$PY $CLI schedule update --mark-run
+$PY $CLI schedule update --mark-run    # also logs "run started" to the run log
 $PY $CLI repos crawl
 $PY $CLI items list --status open,in-progress
 ```
+
+**Run log** (`data/agent-runs.log`): every run must leave a trace. The
+mark-run above logs the start automatically; you log the rest:
+
+```bash
+$PY $CLI runlog add "item <id> -> needs-review (<one-line outcome>)"
+$PY $CLI runlog add "run finished: 2 items worked, 1 left open"
+$PY $CLI runlog tail          # recent history when debugging
+```
+
+Log an item line after finishing each item, a `run finished` line at the end
+(even when there was nothing to do — "run finished: no open items"), and a
+line for anything abnormal (rate limit, hand-off, failure). A scheduled slot
+with no "run started" line means the run never executed at all (e.g. the
+model was rate-limited before it could act); a "run started" with no
+"run finished" means it died mid-run — check for stale in-progress items.
 
 ## 2. Triage
 
