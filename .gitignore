@@ -28,3 +28,6 @@ build/
 .DS_Store
 .idea/
 .vscode/
+
+# session-local preview config
+.claude/launch.json
