@@ -36,6 +36,14 @@ def main(argv: list[str] | None = None) -> None:
 
     p = sub.add_parser("show", help="print an item with its full thread")
     p.add_argument("id")
+    p.add_argument("--new", action="store_true",
+                   help="only messages after the agent's last reply")
+
+    p = sub.add_parser("fetch", help="download an item's attachments to data/")
+    p.add_argument("id")
+    p.add_argument("--new", action="store_true",
+                   help="only attachments from messages after the agent's last reply")
+    p.add_argument("--out", help="target directory (default data/attachments/<id>)")
 
     p = sub.add_parser("create", help="create a new open item")
     p.add_argument("--title", required=True)
@@ -92,7 +100,10 @@ def main(argv: list[str] | None = None) -> None:
             statuses = args.status.split(",") if args.status else None
             _print(mod.list_items(statuses))
         elif args.cmd == "show":
-            _print(mod.show_item(args.id))
+            _print(mod.show_item(args.id, new_only=args.new))
+        elif args.cmd == "fetch":
+            _print(mod.fetch_attachments(args.id, new_only=args.new,
+                                         out_dir=args.out))
         elif args.cmd == "create":
             _print({"id": mod.create_item(args.title, args.repo, args.text,
                                           args.model, args.effort)})

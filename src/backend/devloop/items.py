@@ -144,12 +144,58 @@ def post_message(item_id: str, text: str, author: str = "agent",
     return msg_id
 
 
-def show_item(item_id: str) -> dict:
-    doc = _items().document(item_id).get()
-    if not doc.exists:
-        raise SystemExit(f"item {item_id} not found")
-    messages = [
+def _thread(doc) -> list[dict]:
+    return [
         {"id": m.id, **{k: _iso(v) for k, v in (m.to_dict() or {}).items()}}
         for m in doc.reference.collection("messages").order_by("createdAt").stream()
     ]
-    return {**_summary(doc), "messages": messages}
+
+
+def _after_last_agent_reply(messages: list[dict]) -> list[dict]:
+    """Messages posted after the agent's last reply (all, if it never replied)."""
+    last_agent = max(
+        (i for i, m in enumerate(messages) if m.get("author") == "agent"),
+        default=-1,
+    )
+    return messages[last_agent + 1:]
+
+
+def show_item(item_id: str, new_only: bool = False) -> dict:
+    doc = _items().document(item_id).get()
+    if not doc.exists:
+        raise SystemExit(f"item {item_id} not found")
+    messages = _thread(doc)
+    result = {**_summary(doc)}
+    if new_only:
+        new = _after_last_agent_reply(messages)
+        result["newMessages"] = new
+        result["olderMessageCount"] = len(messages) - len(new)
+    else:
+        result["messages"] = messages
+    return result
+
+
+def fetch_attachments(item_id: str, new_only: bool = False,
+                      out_dir: str | None = None) -> list[str]:
+    """Download an item's attachments so the agent can open them on demand.
+
+    Files land in data/attachments/{itemId}/{msgId}/{name} (or --out DIR).
+    """
+    doc = _items().document(item_id).get()
+    if not doc.exists:
+        raise SystemExit(f"item {item_id} not found")
+    messages = _thread(doc)
+    if new_only:
+        messages = _after_last_agent_reply(messages)
+    base = Path(out_dir).expanduser() if out_dir else (
+        config.DATA_DIR / "attachments" / item_id
+    )
+    bucket = fs.bucket()
+    paths: list[str] = []
+    for msg in messages:
+        for att in msg.get("attachments") or []:
+            target = base / msg["id"] / att["name"]
+            target.parent.mkdir(parents=True, exist_ok=True)
+            bucket.blob(att["storagePath"]).download_to_filename(str(target))
+            paths.append(str(target))
+    return paths
