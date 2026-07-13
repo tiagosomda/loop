@@ -3,12 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../firebase_options.dart';
+import '../models/models.dart';
 
 enum BoardView { list, kanban }
+
+const _statusFilterPrefsKey = 'statusFilter';
 
 class AppState extends ChangeNotifier {
   AppState() {
     _restoreTheme();
+    _restoreStatusFilter();
     FirebaseAuth.instance.authStateChanges().listen((u) {
       user = u;
       notifyListeners();
@@ -66,11 +70,24 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> _restoreStatusFilter() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getStringList(_statusFilterPrefsKey);
+    if (saved == null) return;
+    statusFilter
+      ..clear()
+      ..addAll(saved.where(itemStatuses.contains));
+    notifyListeners();
+  }
+
   void toggleStatusFilter(String status) {
     statusFilter.contains(status)
         ? statusFilter.remove(status)
         : statusFilter.add(status);
     notifyListeners();
+    SharedPreferences.getInstance().then(
+      (prefs) => prefs.setStringList(_statusFilterPrefsKey, statusFilter.toList()),
+    );
   }
 
   void toggleShowArchived() {
