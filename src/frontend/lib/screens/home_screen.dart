@@ -344,8 +344,7 @@ class _BoardControlsState extends State<_BoardControls> {
   @override
   Widget build(BuildContext context) {
     final board = context.read<BoardService>();
-    final selectedStatusCount = app.statusFilter.length;
-    final statusFilterIsActive = selectedStatusCount != itemStatuses.length;
+    final statusFilterIsActive = app.statusFilter.length != itemStatuses.length;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
       child: Column(
@@ -361,12 +360,20 @@ class _BoardControlsState extends State<_BoardControls> {
                 icon: Icon(_searchVisible ? Icons.search_off : Icons.search),
                 onPressed: _toggleSearch,
               ),
-              Badge(
-                label: Text('$selectedStatusCount'),
-                isLabelVisible: statusFilterIsActive,
+              Semantics(
+                selected: statusFilterIsActive,
                 child: IconButton(
-                  tooltip: 'Filter by status',
-                  icon: const Icon(Icons.filter_list),
+                  tooltip: statusFilterIsActive
+                      ? 'Filter by status (active)'
+                      : 'Filter by status',
+                  // A color shift quietly communicates that the board is
+                  // filtered without resembling a notification badge.
+                  icon: Icon(
+                    Icons.filter_list,
+                    color: statusFilterIsActive
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
                   onPressed: _openStatusFilterSheet,
                 ),
               ),
