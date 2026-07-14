@@ -132,6 +132,16 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--enabled-only", action="store_true")
     sub.add_parser("publish", help="publish selectable targets for the frontend")
 
+    # route
+    route = top.add_parser("route", help="local provider routing")
+    sub = route.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("context", help="print sanitized routing context")
+    p.add_argument("id")
+    p = sub.add_parser("decide", help="ask the local router for a validated decision")
+    p.add_argument("id")
+    p.add_argument("--shadow", action="store_true",
+                   help="record the decision locally without dispatching")
+
     # rules
     rules = top.add_parser("rules", help="shared security-rules management")
     sub = rules.add_subparsers(dest="cmd", required=True)
@@ -214,6 +224,16 @@ def main(argv: list[str] | None = None) -> None:
                                        enabled_only=args.enabled_only))
         elif args.cmd == "publish":
             _print(mod.publish())
+    elif args.group == "route":
+        from devloop import router as mod
+        context = mod.build_context(args.id)
+        if args.cmd == "context":
+            _print(context)
+        elif args.cmd == "decide":
+            decision = mod.decide(context)
+            if args.shadow:
+                mod.record_shadow(context, decision)
+            _print(decision)
     elif args.group == "rules":
         from devloop import rules as mod
         if args.cmd == "pull":

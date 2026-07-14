@@ -122,6 +122,17 @@ class RoutingCatalog {
     }
     return null;
   }
+
+  RoutingTarget? targetForAdapter(String? adapter) {
+    if (adapter == null) return null;
+    for (final target in targets) {
+      if (target.adapter == adapter) return target;
+    }
+    return null;
+  }
+
+  List<String> get providers =>
+      targets.map((target) => target.adapter).toSet().toList(growable: false);
 }
 
 /// Whether [item] belongs on the board for the current archived toggle:

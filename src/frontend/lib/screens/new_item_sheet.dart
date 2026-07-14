@@ -225,7 +225,7 @@ class _RoutingPreferences extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selected = catalog.target(provider);
+    final selected = catalog.targetForAdapter(provider);
     final models = selected?.models ?? const <String>[];
     final efforts = selected?.effortLevels ?? effortOptions.skip(1).toList();
     return ExpansionTile(
@@ -244,11 +244,8 @@ class _RoutingPreferences extends StatelessWidget {
           decoration: const InputDecoration(labelText: 'Provider'),
           items: [
             const DropdownMenuItem(value: null, child: Text('Auto')),
-            for (final target in catalog.targets)
-              DropdownMenuItem(
-                value: target.targetId,
-                child: Text(target.adapter),
-              ),
+            for (final adapter in catalog.providers)
+              DropdownMenuItem(value: adapter, child: Text(adapter)),
           ],
           onChanged: onProvider,
         ),

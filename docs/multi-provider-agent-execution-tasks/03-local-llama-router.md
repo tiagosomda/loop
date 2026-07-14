@@ -1,6 +1,6 @@
 # Task 03: Local llama.cpp router
 
-Status: in-progress
+Status: completed
 
 ## Scope
 
@@ -18,4 +18,11 @@ Status: in-progress
 
 ## Completion evidence
 
-Pending.
+- Added sanitized item/repository/attachment/request context construction.
+- Added low-temperature, JSON-schema-constrained llama.cpp chat completion
+  calls with strict post-generation validation.
+- Added override, target, provider, model, effort, and unexpected-field checks.
+- Added local JSONL shadow recording with no item claim or dispatch side effect.
+- Seventeen backend tests, Flutter analysis, and 25 Flutter tests pass.
+- A live Gemma 3 4B smoke test selected the enabled Codex target with low
+  effort and high confidence for a small README correction.

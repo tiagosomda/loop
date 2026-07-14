@@ -1,6 +1,6 @@
 # Task 04: Run records and routing events
 
-Status: pending
+Status: in-progress
 
 ## Scope
 

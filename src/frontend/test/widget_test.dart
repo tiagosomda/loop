@@ -135,6 +135,7 @@ void main() {
       'codex-standard',
     ]);
     expect(catalog.target('claude-standard'), isNull);
+    expect(catalog.providers, ['codex']);
   });
 
   group('literal status filtering', () {
