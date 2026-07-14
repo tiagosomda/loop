@@ -47,7 +47,8 @@ def routing_event_payload(run_id: str, assignment: dict[str, Any],
 
 
 def create_assignment(item_id: str, decision: dict[str, Any], *,
-                      catalog_version: str, router_model: str) -> str:
+                      catalog_version: str, router_model: str,
+                      post_event: bool = True) -> str:
     """Record an assignment before dispatch; item request fields stay untouched."""
     run_id = uuid.uuid4().hex
     item_ref = fs.db().collection(config.ITEMS).document(item_id)
@@ -61,13 +62,16 @@ def create_assignment(item_id: str, decision: dict[str, Any], *,
         "updatedAt": firestore.SERVER_TIMESTAMP,
     })
     batch.commit()
-    post_routing_event(item_ref, run_id, payload)
+    if post_event:
+        post_routing_event(item_ref, run_id, payload)
     return run_id
 
 
-def post_routing_event(item_ref, run_id: str, assignment: dict[str, Any],
+def post_routing_event(item_or_ref, run_id: str, assignment: dict[str, Any],
                        *, state: str = "assigned") -> str:
     """Create one deterministic event document; retries cannot duplicate it."""
+    item_ref = (fs.db().collection(config.ITEMS).document(item_or_ref)
+                if isinstance(item_or_ref, str) else item_or_ref)
     event_id = f"routing-{run_id}-{state}"
     event_ref = item_ref.collection("messages").document(event_id)
     transaction = fs.db().transaction()

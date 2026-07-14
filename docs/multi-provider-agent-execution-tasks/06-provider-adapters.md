@@ -1,6 +1,6 @@
 # Task 06: Codex and Claude adapters
 
-Status: pending
+Status: in-progress
 
 ## Scope
 

@@ -1,6 +1,6 @@
 # Task 05: Dispatcher and fake adapter
 
-Status: in-progress
+Status: completed
 
 ## Scope
 
@@ -17,4 +17,10 @@ Status: in-progress
 
 ## Completion evidence
 
-Pending.
+- Added a normalized adapter/result contract and side-effect-free fake adapter.
+- Added deterministic dispatch ordering: eligibility and Git preflight, run
+  record, claim, routing event, adapter invocation, and finalization.
+- Existing clean checkout and branch are used with no worktree; dirty
+  repositories are rejected before claim or worker execution.
+- Worker exceptions become normalized failed results and still finalize.
+- Twenty-three backend contract tests pass.
