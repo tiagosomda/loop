@@ -8,30 +8,30 @@ class AppTheme {
   static const _violet = Color(0xFFA78BFA);
 
   static ThemeData dark() => _base(
-        ColorScheme.fromSeed(
-          seedColor: _cyan,
-          brightness: Brightness.dark,
-          surface: const Color(0xFF0B0F1A),
-          primary: _cyan,
-          secondary: _violet,
-        ),
-        scaffold: const Color(0xFF070A12),
-        card: const Color(0xFF111828),
-        outline: const Color(0xFF243044),
-      );
+    ColorScheme.fromSeed(
+      seedColor: _cyan,
+      brightness: Brightness.dark,
+      surface: const Color(0xFF0B0F1A),
+      primary: _cyan,
+      secondary: _violet,
+    ),
+    scaffold: const Color(0xFF070A12),
+    card: const Color(0xFF111828),
+    outline: const Color(0xFF243044),
+  );
 
   static ThemeData light() => _base(
-        ColorScheme.fromSeed(
-          seedColor: const Color(0xFF0E7490),
-          brightness: Brightness.light,
-          surface: Colors.white,
-          primary: const Color(0xFF0E7490),
-          secondary: const Color(0xFF7C3AED),
-        ),
-        scaffold: const Color(0xFFF4F6FB),
-        card: Colors.white,
-        outline: const Color(0xFFD8DEE9),
-      );
+    ColorScheme.fromSeed(
+      seedColor: const Color(0xFF0E7490),
+      brightness: Brightness.light,
+      surface: Colors.white,
+      primary: const Color(0xFF0E7490),
+      secondary: const Color(0xFF7C3AED),
+    ),
+    scaffold: const Color(0xFFF4F6FB),
+    card: Colors.white,
+    outline: const Color(0xFFD8DEE9),
+  );
 
   // Shared corner radius so every surface reads from the same design grid.
   static const double radius = 12;

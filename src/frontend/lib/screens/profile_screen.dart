@@ -38,13 +38,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(app.user?.displayName ?? 'tiago',
-                        style: Theme.of(context).textTheme.titleMedium),
-                    Text(app.user?.email ?? '',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: scheme.onSurface.withValues(alpha: 0.6),
-                        )),
+                    Text(
+                      app.user?.displayName ?? 'tiago',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    Text(
+                      app.user?.email ?? '',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -59,11 +63,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
           const SizedBox(height: 24),
-          Text('AGENT SCHEDULE',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    letterSpacing: 1.5,
-                    color: scheme.primary,
-                  )),
+          Text(
+            'AGENT SCHEDULE',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              letterSpacing: 1.5,
+              color: scheme.primary,
+            ),
+          ),
           const SizedBox(height: 8),
           StreamBuilder<ScheduleInfo>(
             stream: board.schedule(),
@@ -105,11 +111,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             },
           ),
           const SizedBox(height: 24),
-          Text('REPOS',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    letterSpacing: 1.5,
-                    color: scheme.primary,
-                  )),
+          Text(
+            'REPOS',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              letterSpacing: 1.5,
+              color: scheme.primary,
+            ),
+          ),
           const SizedBox(height: 8),
           TextField(
             decoration: const InputDecoration(
@@ -131,25 +139,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 );
               }
               final q = _repoSearch.trim().toLowerCase();
-              final repos = snap.data!
-                  .where((r) =>
-                      q.isEmpty ||
-                      r.path.toLowerCase().contains(q) ||
-                      r.name.toLowerCase().contains(q))
-                  .toList()
-                ..sort((a, b) => a.path.compareTo(b.path));
+              final repos =
+                  snap.data!
+                      .where(
+                        (r) =>
+                            q.isEmpty ||
+                            r.path.toLowerCase().contains(q) ||
+                            r.name.toLowerCase().contains(q),
+                      )
+                      .toList()
+                    ..sort((a, b) => a.path.compareTo(b.path));
               if (repos.isEmpty) return const Text('No repos found.');
               return Column(
                 children: [
                   for (final repo in repos)
                     ListTile(
                       dense: true,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 4),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                       leading: Icon(
-                        repo.host == 'gitlab'
-                            ? Icons.merge_type
-                            : Icons.code,
+                        repo.host == 'gitlab' ? Icons.merge_type : Icons.code,
                         size: 18,
                         color: repo.status == 'removed'
                             ? scheme.error
@@ -166,15 +174,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       subtitle: repo.remote == null
                           ? null
-                          : Text(repo.remote!,
+                          : Text(
+                              repo.remote!,
                               style: const TextStyle(fontSize: 11),
-                              overflow: TextOverflow.ellipsis),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                       trailing: repo.status == 'removed'
                           ? IconButton(
                               tooltip: 'Clear removed repo',
                               icon: const Icon(Icons.close, size: 16),
-                              onPressed: () =>
-                                  board.clearRemovedRepo(repo.id),
+                              onPressed: () => board.clearRemovedRepo(repo.id),
                             )
                           : null,
                     ),

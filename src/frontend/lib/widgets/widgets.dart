@@ -51,7 +51,12 @@ String repoShortName(String repoId) =>
     repoId.split('__').isEmpty ? repoId : repoId.split('__').last;
 
 class ItemCard extends StatelessWidget {
-  const ItemCard({super.key, required this.item, required this.onTap, this.dragHandle});
+  const ItemCard({
+    super.key,
+    required this.item,
+    required this.onTap,
+    this.dragHandle,
+  });
 
   final ActionItem item;
   final VoidCallback onTap;
@@ -100,10 +105,18 @@ class ItemCard extends StatelessWidget {
                 runSpacing: 4,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  _meta(Icons.folder_outlined, repoShortName(item.repoId), scheme),
+                  _meta(
+                    Icons.folder_outlined,
+                    repoShortName(item.repoId),
+                    scheme,
+                  ),
                   _meta(Icons.schedule, relativeTime(item.updatedAt), scheme),
                   if (item.messageCount > 0)
-                    _meta(Icons.chat_bubble_outline, '${item.messageCount}', scheme),
+                    _meta(
+                      Icons.chat_bubble_outline,
+                      '${item.messageCount}',
+                      scheme,
+                    ),
                   if (item.model != null && item.model != 'default')
                     _meta(Icons.memory, item.model!, scheme),
                 ],

@@ -62,6 +62,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--text", help="first message")
     p.add_argument("--model")
     p.add_argument("--effort")
+    p.add_argument("--provider")
 
     p = sub.add_parser("claim", help="mark in-progress before starting work")
     p.add_argument("id")
@@ -129,6 +130,7 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("list", help="list safe target capabilities and availability")
     p.add_argument("--role", choices=["router", "worker"])
     p.add_argument("--enabled-only", action="store_true")
+    sub.add_parser("publish", help="publish selectable targets for the frontend")
 
     # rules
     rules = top.add_parser("rules", help="shared security-rules management")
@@ -158,7 +160,7 @@ def main(argv: list[str] | None = None) -> None:
                                          out_dir=args.out))
         elif args.cmd == "create":
             _print({"id": mod.create_item(args.title, args.repo, args.text,
-                                          args.model, args.effort)})
+                                          args.model, args.effort, args.provider)})
         elif args.cmd == "claim":
             mod.claim_item(args.id)
             print(f"{args.id} -> in-progress")
@@ -210,6 +212,8 @@ def main(argv: list[str] | None = None) -> None:
         if args.cmd == "list":
             _print(mod.safe_projection(role=args.role,
                                        enabled_only=args.enabled_only))
+        elif args.cmd == "publish":
+            _print(mod.publish())
     elif args.group == "rules":
         from devloop import rules as mod
         if args.cmd == "pull":

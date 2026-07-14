@@ -42,8 +42,8 @@ class LoggedOutScreen extends StatelessWidget {
                   wrongAccount
                       ? 'This account is not authorized for the board.'
                       : "This is tiago's dev loop experiment — a board of "
-                          'action items that an AI agent picks up and works '
-                          'on, on a schedule.',
+                            'action items that an AI agent picks up and works '
+                            'on, on a schedule.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),

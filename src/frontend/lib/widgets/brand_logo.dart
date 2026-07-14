@@ -147,7 +147,8 @@ class _SpinningDevLoopLogoState extends State<SpinningDevLoopLogo>
 
     // 0 on the first tap of a streak, 1 once the streak is maxed out.
     final speedUp = (_tapStreak - 1) / (_maxTapStreak - 1);
-    final turnDurationMs = _baseTurnDuration.inMilliseconds -
+    final turnDurationMs =
+        _baseTurnDuration.inMilliseconds -
         (_baseTurnDuration.inMilliseconds - _minTurnDuration.inMilliseconds) *
             speedUp;
 
@@ -197,7 +198,11 @@ class _SpinningDevLoopLogoState extends State<SpinningDevLoopLogo>
 }
 
 class BrandTitle extends StatelessWidget {
-  const BrandTitle({super.key, this.scheduleTimes = const [], this.showLogo = true});
+  const BrandTitle({
+    super.key,
+    this.scheduleTimes = const [],
+    this.showLogo = true,
+  });
 
   final List<String> scheduleTimes;
 

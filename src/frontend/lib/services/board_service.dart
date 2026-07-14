@@ -26,6 +26,8 @@ class BoardService {
       _db.collection('dev-loop/app/repos');
   DocumentReference<Map<String, dynamic>> get _schedule =>
       _db.doc('dev-loop/app/meta/schedule');
+  DocumentReference<Map<String, dynamic>> get _targets =>
+      _db.doc('dev-loop/app/meta/targets');
 
   /// Whether a [refresh] round-trip is currently in flight. The board views
   /// use this to render an explicit "refreshing" affordance (on top of
@@ -74,9 +76,9 @@ class BoardService {
       .snapshots()
       .map((s) => [for (final d in s.docs) ThreadMessage.fromDoc(d)]);
 
-  Stream<List<RepoInfo>> repos() => _repos
-      .snapshots()
-      .map((s) => [for (final d in s.docs) RepoInfo.fromDoc(d)]);
+  Stream<List<RepoInfo>> repos() => _repos.snapshots().map(
+    (s) => [for (final d in s.docs) RepoInfo.fromDoc(d)],
+  );
 
   Stream<RepoInfo?> repo(String id) => _repos
       .doc(id)
@@ -85,6 +87,9 @@ class BoardService {
 
   Stream<ScheduleInfo> schedule() =>
       _schedule.snapshots().map((d) => ScheduleInfo.fromMap(d.data()));
+
+  Stream<RoutingCatalog> routingCatalog() =>
+      _targets.snapshots().map((d) => RoutingCatalog.fromMap(d.data()));
 
   /// Order value that places a new item at the end of the manual order:
   /// one gap-step past the current highest `order` (or fallback creation-time
@@ -103,8 +108,9 @@ class BoardService {
   Future<String> createItem({
     required String title,
     required String repoId,
-    String? model,
-    String? effortLevel,
+    String? requestedProvider,
+    String? requestedModel,
+    String? requestedEffort,
     String? firstMessage,
     List<PendingAttachment> attachments = const [],
   }) async {
@@ -113,8 +119,9 @@ class BoardService {
       'title': title,
       'repoId': repoId,
       'status': 'open',
-      'model': model,
-      'effortLevel': effortLevel,
+      'requestedProvider': requestedProvider,
+      'requestedModel': requestedModel,
+      'requestedEffort': requestedEffort,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
       'lastAgentRunAt': null,
@@ -128,30 +135,28 @@ class BoardService {
     return ref.id;
   }
 
-  Future<void> setStatus(String itemId, String status) => _items.doc(itemId).update({
-        'status': status,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+  Future<void> setStatus(String itemId, String status) => _items
+      .doc(itemId)
+      .update({'status': status, 'updatedAt': FieldValue.serverTimestamp()});
 
   /// Archiving is an orthogonal flag to `status`: an archived item keeps its
   /// status but drops out of the default board view.
   Future<void> archiveItem(String itemId) => _items.doc(itemId).update({
-        'archived': true,
-        'archivedAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+    'archived': true,
+    'archivedAt': FieldValue.serverTimestamp(),
+    'updatedAt': FieldValue.serverTimestamp(),
+  });
 
   Future<void> unarchiveItem(String itemId) => _items.doc(itemId).update({
-        'archived': false,
-        'archivedAt': null,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+    'archived': false,
+    'archivedAt': null,
+    'updatedAt': FieldValue.serverTimestamp(),
+  });
 
   /// Archive every closed, not-yet-archived item in one batch. Returns the
   /// number of items archived.
   Future<int> archiveClosed() async {
-    final snap =
-        await _items.where('status', isEqualTo: 'closed').get();
+    final snap = await _items.where('status', isEqualTo: 'closed').get();
     final batch = _db.batch();
     var count = 0;
     for (final doc in snap.docs) {
@@ -167,13 +172,15 @@ class BoardService {
     return count;
   }
 
-  Future<void> setModelEffort(String itemId,
-          {String? model, String? effortLevel}) =>
-      _items.doc(itemId).update({
-        'model': model,
-        'effortLevel': effortLevel,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+  Future<void> setModelEffort(
+    String itemId, {
+    String? model,
+    String? effortLevel,
+  }) => _items.doc(itemId).update({
+    'model': model,
+    'effortLevel': effortLevel,
+    'updatedAt': FieldValue.serverTimestamp(),
+  });
 
   Future<void> postMessage(
     String itemId,
@@ -185,16 +192,17 @@ class BoardService {
     final uploaded = <Attachment>[];
     for (final a in attachments) {
       final path = 'dev-loop/attachments/$itemId/${msgRef.id}/${a.name}';
-      await _storage.ref(path).putData(
-            a.bytes,
-            SettableMetadata(contentType: a.contentType),
-          );
-      uploaded.add(Attachment(
-        name: a.name,
-        storagePath: path,
-        contentType: a.contentType,
-        size: a.bytes.length,
-      ));
+      await _storage
+          .ref(path)
+          .putData(a.bytes, SettableMetadata(contentType: a.contentType));
+      uploaded.add(
+        Attachment(
+          name: a.name,
+          storagePath: path,
+          contentType: a.contentType,
+          size: a.bytes.length,
+        ),
+      );
     }
     await msgRef.set({
       'author': author,
@@ -272,8 +280,9 @@ class BoardService {
     list.insert(insertAt, moved);
 
     final before = insertAt > 0 ? effectiveOrder(list[insertAt - 1]) : null;
-    final after =
-        insertAt < list.length - 1 ? effectiveOrder(list[insertAt + 1]) : null;
+    final after = insertAt < list.length - 1
+        ? effectiveOrder(list[insertAt + 1])
+        : null;
 
     double newOrder;
     if (before == null && after == null) {
@@ -309,7 +318,7 @@ class BoardService {
     final scopeIds = scope.map((i) => i.id).toSet();
     final otherOrders = [
       for (final i in allItems)
-        if (!scopeIds.contains(i.id)) effectiveOrder(i)
+        if (!scopeIds.contains(i.id)) effectiveOrder(i),
     ];
     final newOrders = renumberedOrders(
       scopeOrders: [for (final i in scope) effectiveOrder(i)],

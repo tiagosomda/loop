@@ -8,7 +8,6 @@ const itemStatuses = [
   'closed',
 ];
 
-const modelOptions = ['default', 'haiku', 'sonnet', 'opus', 'fable'];
 const effortOptions = ['default', 'low', 'medium', 'high', 'max'];
 
 DateTime? _ts(dynamic v) => v is Timestamp ? v.toDate() : null;
@@ -20,6 +19,9 @@ class ActionItem {
   final String status;
   final String? model;
   final String? effortLevel;
+  final String? requestedProvider;
+  final String? requestedModel;
+  final String? requestedEffort;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final DateTime? lastAgentRunAt;
@@ -35,6 +37,9 @@ class ActionItem {
     required this.status,
     this.model,
     this.effortLevel,
+    this.requestedProvider,
+    this.requestedModel,
+    this.requestedEffort,
     this.createdAt,
     this.updatedAt,
     this.lastAgentRunAt,
@@ -53,6 +58,9 @@ class ActionItem {
       status: d['status'] ?? 'open',
       model: d['model'],
       effortLevel: d['effortLevel'],
+      requestedProvider: d['requestedProvider'],
+      requestedModel: d['requestedModel'] ?? d['model'],
+      requestedEffort: d['requestedEffort'] ?? d['effortLevel'],
       createdAt: _ts(d['createdAt']),
       updatedAt: _ts(d['updatedAt']),
       lastAgentRunAt: _ts(d['lastAgentRunAt']),
@@ -61,6 +69,58 @@ class ActionItem {
       archivedAt: _ts(d['archivedAt']),
       order: (d['order'] as num?)?.toDouble(),
     );
+  }
+}
+
+class RoutingTarget {
+  final String targetId;
+  final String adapter;
+  final String location;
+  final List<String> models;
+  final List<String> effortLevels;
+
+  const RoutingTarget({
+    required this.targetId,
+    required this.adapter,
+    required this.location,
+    required this.models,
+    required this.effortLevels,
+  });
+
+  factory RoutingTarget.fromMap(Map<String, dynamic> map) => RoutingTarget(
+    targetId: map['targetId'] ?? '',
+    adapter: map['adapter'] ?? '',
+    location: map['location'] ?? '',
+    models: [
+      for (final value in (map['models'] as List? ?? [])) value.toString(),
+    ],
+    effortLevels: [
+      for (final value in (map['effortLevels'] as List? ?? []))
+        value.toString(),
+    ],
+  );
+}
+
+class RoutingCatalog {
+  final String catalogVersion;
+  final List<RoutingTarget> targets;
+
+  const RoutingCatalog({required this.catalogVersion, required this.targets});
+
+  factory RoutingCatalog.fromMap(Map<String, dynamic>? map) => RoutingCatalog(
+    catalogVersion: map?['catalogVersion'] ?? '',
+    targets: [
+      for (final target in (map?['targets'] as List? ?? []))
+        RoutingTarget.fromMap(Map<String, dynamic>.from(target)),
+    ],
+  );
+
+  RoutingTarget? target(String? targetId) {
+    if (targetId == null) return null;
+    for (final target in targets) {
+      if (target.targetId == targetId) return target;
+    }
+    return null;
   }
 }
 

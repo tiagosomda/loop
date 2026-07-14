@@ -118,6 +118,25 @@ void main() {
     ]);
   });
 
+  test('routing catalog visibility is entirely data driven', () {
+    final catalog = RoutingCatalog.fromMap({
+      'catalogVersion': 'test',
+      'targets': [
+        {
+          'targetId': 'codex-standard',
+          'adapter': 'codex',
+          'location': 'cloud',
+          'models': ['default'],
+          'effortLevels': ['low', 'high'],
+        },
+      ],
+    });
+    expect(catalog.targets.map((target) => target.targetId), [
+      'codex-standard',
+    ]);
+    expect(catalog.target('claude-standard'), isNull);
+  });
+
   group('literal status filtering', () {
     final item = ActionItem(id: 'x', title: 't', repoId: 'r', status: 'open');
 

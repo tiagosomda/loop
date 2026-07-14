@@ -137,3 +137,25 @@ def enabled_available_workers(path: Path | None = None) -> list[dict[str, Any]]:
     projection = safe_projection(role="worker", enabled_only=True, path=path)
     return [target for target in projection["targets"]
             if target["availability"]["available"]]
+
+
+def frontend_projection(path: Path | None = None) -> dict[str, Any]:
+    """Safe, selectable workers only; this is the frontend's sole option source."""
+    projection = safe_projection(role="worker", enabled_only=True, path=path)
+    projection["targets"] = [
+        {key: value for key, value in target.items() if key != "availability"}
+        for target in projection["targets"]
+        if target["availability"]["available"]
+    ]
+    return projection
+
+
+def publish(path: Path | None = None) -> dict[str, Any]:
+    """Publish a secret-free selectable catalog snapshot to Firestore."""
+    from firebase_admin import firestore
+    from . import fs
+
+    projection = frontend_projection(path)
+    payload = {**projection, "updatedAt": firestore.SERVER_TIMESTAMP}
+    fs.db().document(config.TARGETS_DOC).set(payload)
+    return projection

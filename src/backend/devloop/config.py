@@ -17,6 +17,7 @@ ROOT_DOC = "dev-loop/app"
 ITEMS = f"{ROOT_DOC}/items"
 REPOS = f"{ROOT_DOC}/repos"
 SCHEDULE_DOC = f"{ROOT_DOC}/meta/schedule"
+TARGETS_DOC = f"{ROOT_DOC}/meta/targets"
 
 # Attachments live under this Storage prefix.
 ATTACHMENTS_PREFIX = "dev-loop/attachments"

@@ -31,6 +31,9 @@ def _summary(doc) -> dict:
         "status": data.get("status"),
         "model": data.get("model"),
         "effortLevel": data.get("effortLevel"),
+        "requestedProvider": data.get("requestedProvider"),
+        "requestedModel": data.get("requestedModel", data.get("model")),
+        "requestedEffort": data.get("requestedEffort", data.get("effortLevel")),
         "createdAt": _iso(data.get("createdAt")),
         "updatedAt": _iso(data.get("updatedAt")),
         "lastAgentRunAt": _iso(data.get("lastAgentRunAt")),
@@ -129,14 +132,15 @@ def _next_order() -> float:
 
 
 def create_item(title: str, repo_id: str, text: str | None, model: str | None,
-                effort: str | None) -> str:
+                effort: str | None, provider: str | None = None) -> str:
     ref = _items().document()
     ref.set({
         "title": title,
         "repoId": repo_id,
         "status": "open",
-        "model": model,
-        "effortLevel": effort,
+        "requestedProvider": provider,
+        "requestedModel": model,
+        "requestedEffort": effort,
         "createdAt": firestore.SERVER_TIMESTAMP,
         "updatedAt": firestore.SERVER_TIMESTAMP,
         "lastAgentRunAt": None,

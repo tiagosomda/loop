@@ -9,7 +9,10 @@ import 'home_screen.dart';
 /// Opens the full-screen "new action item" composer.
 Future<void> openNewItemScreen(BuildContext context) {
   return Navigator.of(context).push(
-    MaterialPageRoute(builder: (_) => const NewItemScreen(), fullscreenDialog: true),
+    MaterialPageRoute(
+      builder: (_) => const NewItemScreen(),
+      fullscreenDialog: true,
+    ),
   );
 }
 
@@ -24,8 +27,10 @@ class _NewItemScreenState extends State<NewItemScreen> {
   final _title = TextEditingController();
   final _message = TextEditingController();
   String? _repoId;
-  String _model = 'default';
-  String _effort = 'default';
+  String? _provider;
+  String? _model;
+  String? _effort;
+  bool _customizeRouting = false;
   final List<PendingAttachment> _pending = [];
   bool _saving = false;
 
@@ -63,10 +68,11 @@ class _NewItemScreenState extends State<NewItemScreen> {
             StreamBuilder<List<RepoInfo>>(
               stream: board.repos(),
               builder: (context, snap) {
-                final repos = (snap.data ?? [])
-                    .where((r) => r.status == 'active')
-                    .toList()
-                  ..sort((a, b) => _repoLabel(a).compareTo(_repoLabel(b)));
+                final repos =
+                    (snap.data ?? [])
+                        .where((r) => r.status == 'active')
+                        .toList()
+                      ..sort((a, b) => _repoLabel(a).compareTo(_repoLabel(b)));
                 return _RepoAutocomplete(
                   repos: repos,
                   onSelected: (id) => setState(() => _repoId = id),
@@ -74,34 +80,25 @@ class _NewItemScreenState extends State<NewItemScreen> {
               },
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _model,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Model'),
-                    items: [
-                      for (final m in modelOptions)
-                        DropdownMenuItem(value: m, child: Text(m)),
-                    ],
-                    onChanged: (v) => setState(() => _model = v ?? 'default'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _effort,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Effort'),
-                    items: [
-                      for (final e in effortOptions)
-                        DropdownMenuItem(value: e, child: Text(e)),
-                    ],
-                    onChanged: (v) => setState(() => _effort = v ?? 'default'),
-                  ),
-                ),
-              ],
+            StreamBuilder<RoutingCatalog>(
+              stream: board.routingCatalog(),
+              builder: (context, snapshot) => _RoutingPreferences(
+                catalog:
+                    snapshot.data ??
+                    const RoutingCatalog(catalogVersion: '', targets: []),
+                expanded: _customizeRouting,
+                provider: _provider,
+                model: _model,
+                effort: _effort,
+                onExpanded: (value) =>
+                    setState(() => _customizeRouting = value),
+                onProvider: (value) => setState(() {
+                  _provider = value;
+                  _model = null;
+                }),
+                onModel: (value) => setState(() => _model = value),
+                onEffort: (value) => setState(() => _effort = value),
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -157,11 +154,13 @@ class _NewItemScreenState extends State<NewItemScreen> {
     setState(() {
       for (final f in result.files) {
         if (f.bytes != null) {
-          _pending.add(PendingAttachment(
-            name: f.name,
-            bytes: f.bytes!,
-            contentType: 'application/octet-stream',
-          ));
+          _pending.add(
+            PendingAttachment(
+              name: f.name,
+              bytes: f.bytes!,
+              contentType: 'application/octet-stream',
+            ),
+          );
         }
       }
     });
@@ -180,8 +179,9 @@ class _NewItemScreenState extends State<NewItemScreen> {
       final id = await board.createItem(
         title: title,
         repoId: _repoId!,
-        model: _model == 'default' ? null : _model,
-        effortLevel: _effort == 'default' ? null : _effort,
+        requestedProvider: _provider,
+        requestedModel: _model,
+        requestedEffort: _effort,
         firstMessage: _message.text.trim(),
         attachments: List.of(_pending),
       );
@@ -192,10 +192,102 @@ class _NewItemScreenState extends State<NewItemScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed to create: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to create: $e')));
       }
     }
+  }
+}
+
+class _RoutingPreferences extends StatelessWidget {
+  const _RoutingPreferences({
+    required this.catalog,
+    required this.expanded,
+    required this.provider,
+    required this.model,
+    required this.effort,
+    required this.onExpanded,
+    required this.onProvider,
+    required this.onModel,
+    required this.onEffort,
+  });
+
+  final RoutingCatalog catalog;
+  final bool expanded;
+  final String? provider;
+  final String? model;
+  final String? effort;
+  final ValueChanged<bool> onExpanded;
+  final ValueChanged<String?> onProvider;
+  final ValueChanged<String?> onModel;
+  final ValueChanged<String?> onEffort;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = catalog.target(provider);
+    final models = selected?.models ?? const <String>[];
+    final efforts = selected?.effortLevels ?? effortOptions.skip(1).toList();
+    return ExpansionTile(
+      key: const ValueKey('routing-preferences'),
+      initiallyExpanded: expanded,
+      onExpansionChanged: onExpanded,
+      tilePadding: EdgeInsets.zero,
+      childrenPadding: EdgeInsets.zero,
+      title: const Text('Execution: Automatic'),
+      subtitle: const Text('The local router will choose an available worker.'),
+      children: [
+        DropdownButtonFormField<String?>(
+          key: ValueKey('provider-$provider'),
+          initialValue: provider,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Provider'),
+          items: [
+            const DropdownMenuItem(value: null, child: Text('Auto')),
+            for (final target in catalog.targets)
+              DropdownMenuItem(
+                value: target.targetId,
+                child: Text(target.adapter),
+              ),
+          ],
+          onChanged: onProvider,
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String?>(
+          key: ValueKey('model-$provider-$model'),
+          initialValue: model,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Model'),
+          items: [
+            const DropdownMenuItem(value: null, child: Text('Auto')),
+            for (final value in models)
+              DropdownMenuItem(value: value, child: Text(value)),
+          ],
+          onChanged: selected == null ? null : onModel,
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String?>(
+          key: ValueKey('effort-$provider-$effort'),
+          initialValue: effort,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Effort'),
+          items: [
+            const DropdownMenuItem(value: null, child: Text('Auto')),
+            for (final value in efforts)
+              DropdownMenuItem(value: value, child: Text(value)),
+          ],
+          onChanged: onEffort,
+        ),
+        const SizedBox(height: 8),
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Codex workers run unattended with full access under your macOS user.',
+            style: TextStyle(fontSize: 12),
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -217,10 +309,12 @@ class _RepoAutocomplete extends StatelessWidget {
       optionsBuilder: (value) {
         final q = value.text.trim().toLowerCase();
         if (q.isEmpty) return repos;
-        return repos.where((r) =>
-            _repoLabel(r).toLowerCase().contains(q) ||
-            r.name.toLowerCase().contains(q) ||
-            r.id.toLowerCase().contains(q));
+        return repos.where(
+          (r) =>
+              _repoLabel(r).toLowerCase().contains(q) ||
+              r.name.toLowerCase().contains(q) ||
+              r.id.toLowerCase().contains(q),
+        );
       },
       onSelected: (r) => onSelected(r.id),
       fieldViewBuilder: (context, controller, focusNode, onSubmit) {
@@ -264,18 +358,21 @@ class _RepoAutocomplete extends StatelessWidget {
                   for (final r in options)
                     ListTile(
                       dense: true,
-                      title: Text(_repoLabel(r),
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 13)),
+                      title: Text(
+                        _repoLabel(r),
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13),
+                      ),
                       subtitle: r.remote == null
                           ? null
-                          : Text(r.remote!,
+                          : Text(
+                              r.remote!,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 11,
-                                color:
-                                    scheme.onSurface.withValues(alpha: 0.6),
-                              )),
+                                color: scheme.onSurface.withValues(alpha: 0.6),
+                              ),
+                            ),
                       onTap: () => onSelect(r),
                     ),
                 ],

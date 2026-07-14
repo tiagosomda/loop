@@ -1,6 +1,6 @@
 # Task 02: Routing preferences and frontend catalog
 
-Status: in-progress
+Status: completed
 
 ## Scope
 
@@ -18,4 +18,15 @@ Status: in-progress
 
 ## Completion evidence
 
-Pending.
+- Items now store nullable `requestedProvider`, `requestedModel`, and
+  `requestedEffort`; legacy model/effort values remain readable.
+- The backend publishes only enabled, available, secret-free worker targets to
+  `dev-loop/app/meta/targets`.
+- The new-item screen defaults to Automatic and loads its optional provider,
+  model, and effort choices exclusively from that projection.
+- The item header now distinguishes automatic/requested routing instead of
+  exposing static Claude-oriented selectors.
+- Ten backend tests, Flutter static analysis, and 25 Flutter tests pass.
+- Live publication was attempted but this checkout has no service-account
+  credential; run `devloop targets publish` after configuring
+  `DEV_LOOP_SERVICE_ACCOUNT` or `data/service-account.json`.

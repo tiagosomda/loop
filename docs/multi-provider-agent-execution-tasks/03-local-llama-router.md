@@ -1,6 +1,6 @@
 # Task 03: Local llama.cpp router
 
-Status: pending
+Status: in-progress
 
 ## Scope
 

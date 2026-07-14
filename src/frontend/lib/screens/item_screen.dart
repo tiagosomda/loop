@@ -77,11 +77,13 @@ class _ItemScreenState extends State<ItemScreen> {
     setState(() {
       for (final f in result.files) {
         if (f.bytes != null) {
-          _pending.add(PendingAttachment(
-            name: f.name,
-            bytes: f.bytes!,
-            contentType: _contentType(f.name),
-          ));
+          _pending.add(
+            PendingAttachment(
+              name: f.name,
+              bytes: f.bytes!,
+              contentType: _contentType(f.name),
+            ),
+          );
         }
       }
     });
@@ -118,8 +120,9 @@ class _ItemScreenState extends State<ItemScreen> {
       _pending.clear();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed to send: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to send: $e')));
       }
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -134,7 +137,6 @@ class _ItemHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final board = context.read<BoardService>();
     final scheme = Theme.of(context).colorScheme;
     final muted = scheme.onSurface.withValues(alpha: 0.6);
     return Padding(
@@ -161,8 +163,10 @@ class _ItemHeader extends StatelessWidget {
                     const SizedBox(width: 12),
                     Icon(Icons.schedule, size: 14, color: muted),
                     const SizedBox(width: 4),
-                    Text('updated ${relativeTime(item.updatedAt)}',
-                        style: TextStyle(fontSize: 12, color: muted)),
+                    Text(
+                      'updated ${relativeTime(item.updatedAt)}',
+                      style: TextStyle(fontSize: 12, color: muted),
+                    ),
                   ],
                 ),
               ),
@@ -171,27 +175,12 @@ class _ItemHeader extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
+              Icon(Icons.route_outlined, size: 14, color: muted),
+              const SizedBox(width: 6),
               Expanded(
-                child: _HeaderSelector(
-                  icon: Icons.memory,
-                  label: 'model',
-                  value: item.model ?? 'default',
-                  options: modelOptions,
-                  onChanged: (v) => board.setModelEffort(item.id,
-                      model: v == 'default' ? null : v,
-                      effortLevel: item.effortLevel),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _HeaderSelector(
-                  icon: Icons.bolt_outlined,
-                  label: 'effort',
-                  value: item.effortLevel ?? 'default',
-                  options: effortOptions,
-                  onChanged: (v) => board.setModelEffort(item.id,
-                      model: item.model,
-                      effortLevel: v == 'default' ? null : v),
+                child: Text(
+                  _requestedRoutingSummary(item),
+                  style: TextStyle(fontSize: 12, color: muted),
                 ),
               ),
             ],
@@ -202,87 +191,15 @@ class _ItemHeader extends StatelessWidget {
   }
 }
 
-/// Compact, theme-aware selector used for model/effort in the item header.
-/// Replaces the raw [DropdownButton] (which rendered dark text off-theme in
-/// dark mode) with a bordered chip that opens a themed popup menu.
-class _HeaderSelector extends StatelessWidget {
-  const _HeaderSelector({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.options,
-    required this.onChanged,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final List<String> options;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final muted = scheme.onSurface.withValues(alpha: 0.6);
-    return PopupMenuButton<String>(
-      tooltip: label,
-      initialValue: value,
-      position: PopupMenuPosition.under,
-      onSelected: onChanged,
-      itemBuilder: (_) => [
-        for (final o in options)
-          PopupMenuItem(
-            value: o,
-            child: Row(
-              children: [
-                Icon(
-                  o == value ? Icons.check : null,
-                  size: 16,
-                  color: scheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Text(o),
-              ],
-            ),
-          ),
-      ],
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: scheme.surface.withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Theme.of(context).dividerColor),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 14, color: scheme.primary),
-            const SizedBox(width: 6),
-            Text(
-              label.toUpperCase(),
-              style: TextStyle(
-                fontSize: 10,
-                letterSpacing: 1,
-                color: muted,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                value,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: scheme.onSurface,
-                ),
-              ),
-            ),
-            Icon(Icons.arrow_drop_down, size: 18, color: muted),
-          ],
-        ),
-      ),
-    );
-  }
+String _requestedRoutingSummary(ActionItem item) {
+  final values = [
+    item.requestedProvider,
+    item.requestedModel,
+    item.requestedEffort,
+  ].whereType<String>().toList();
+  return values.isEmpty
+      ? 'Routing: Automatic'
+      : 'Requested: ${values.join(' · ')}';
 }
 
 /// Tappable status chip in the item content — tapping it opens the same
@@ -333,19 +250,21 @@ class _ArchiveButton extends StatelessWidget {
     final board = context.read<BoardService>();
     return IconButton(
       tooltip: item.archived ? 'Unarchive' : 'Archive',
-      icon: Icon(item.archived
-          ? Icons.unarchive_outlined
-          : Icons.archive_outlined),
+      icon: Icon(
+        item.archived ? Icons.unarchive_outlined : Icons.archive_outlined,
+      ),
       onPressed: () async {
         final messenger = ScaffoldMessenger.of(context);
         if (item.archived) {
           await board.unarchiveItem(item.id);
           messenger.showSnackBar(
-              const SnackBar(content: Text('Item unarchived')));
+            const SnackBar(content: Text('Item unarchived')),
+          );
         } else {
           await board.archiveItem(item.id);
           messenger.showSnackBar(
-              const SnackBar(content: Text('Item archived')));
+            const SnackBar(content: Text('Item archived')),
+          );
         }
       },
     );
@@ -371,8 +290,7 @@ class _RepoLinkButton extends StatelessWidget {
           icon: const Icon(Icons.open_in_new),
           onPressed: remote == null
               ? null
-              : () => launchUrl(Uri.parse(remote),
-                  webOnlyWindowName: '_blank'),
+              : () => launchUrl(Uri.parse(remote), webOnlyWindowName: '_blank'),
         );
       },
     );
@@ -444,8 +362,11 @@ class _MessageBubble extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(isAgent ? Icons.smart_toy_outlined : Icons.person_outline,
-                  size: 14, color: accent),
+              Icon(
+                isAgent ? Icons.smart_toy_outlined : Icons.person_outline,
+                size: 14,
+                color: accent,
+              ),
               const SizedBox(width: 6),
               Text(
                 isAgent ? 'agent' : 'tiago',
@@ -462,8 +383,7 @@ class _MessageBubble extends StatelessWidget {
               ),
               if (message.editedAt != null) ...[
                 const SizedBox(width: 6),
-                Text('· edited',
-                    style: TextStyle(fontSize: 11, color: faint)),
+                Text('· edited', style: TextStyle(fontSize: 11, color: faint)),
               ],
               if (!isAgent) ...[
                 const Spacer(),
@@ -491,8 +411,10 @@ class _MessageBubble extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (message.text.isNotEmpty)
-                  SelectableText(message.text,
-                      style: const TextStyle(fontSize: 14, height: 1.45)),
+                  SelectableText(
+                    message.text,
+                    style: const TextStyle(fontSize: 14, height: 1.45),
+                  ),
                 if (message.attachments.isNotEmpty) ...[
                   if (message.text.isNotEmpty) const SizedBox(height: 8),
                   Wrap(
@@ -615,8 +537,10 @@ class _Composer extends StatelessWidget {
                   children: [
                     for (final a in pending)
                       InputChip(
-                        label: Text(a.name,
-                            style: const TextStyle(fontSize: 12)),
+                        label: Text(
+                          a.name,
+                          style: const TextStyle(fontSize: 12),
+                        ),
                         onDeleted: () => onRemoveAttachment(a),
                       ),
                   ],

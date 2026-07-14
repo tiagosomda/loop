@@ -71,6 +71,13 @@ class TargetCatalogTests(unittest.TestCase):
             targets.probe(claude),
         )
 
+    @mock.patch("devloop.targets.shutil.which", return_value="/usr/bin/provider")
+    def test_frontend_projection_is_selectable_and_data_driven(self, _which):
+        projection = targets.frontend_projection()
+        self.assertEqual(["codex-standard"],
+                         [target["targetId"] for target in projection["targets"]])
+        self.assertNotIn("availability", projection["targets"][0])
+
 
 if __name__ == "__main__":
     unittest.main()
