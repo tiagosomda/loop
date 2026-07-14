@@ -64,7 +64,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 24),
           Text(
-            'AGENT SCHEDULE',
+            'LOCAL AUTOMATION',
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
               letterSpacing: 1.5,
               color: scheme.primary,
@@ -98,12 +98,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'last run: ${relativeTime(schedule.lastRunAt)}',
+                        'managed by ${schedule.scheduler} · router: '
+                        '${schedule.routerAvailable ? 'online' : schedule.routerReason ?? 'unknown'}',
                         style: TextStyle(
                           fontSize: 12,
                           color: scheme.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
+                      if (schedule.providers.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'workers: ${schedule.providers.map((provider) => '${provider.adapter} '
+                              '${!provider.enabled
+                                  ? 'disabled'
+                                  : provider.available
+                                  ? 'online'
+                                  : provider.reason ?? 'unavailable'}').join(' · ')}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: scheme.onSurface.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 4),
+                      Text(
+                        'last start: ${relativeTime(schedule.lastRunAt)} · '
+                        'last finish: ${relativeTime(schedule.lastFinishedAt)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                      if (schedule.lastOutcome != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '${schedule.lastOutcome}: ${schedule.lastSummary ?? ''}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: scheme.onSurface.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

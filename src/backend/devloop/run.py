@@ -81,7 +81,7 @@ def _touched_since_last_start() -> list[str]:
     return touched
 
 
-def end(note: str | None = None) -> str:
+def end(note: str | None = None, *, outcome: str = "finished") -> str:
     """Log a "run finished" line. Without --note, summarizes item ids touched
     (claimed or status-changed) since the last "run started" line."""
     if note:
@@ -90,7 +90,12 @@ def end(note: str | None = None) -> str:
         touched = _touched_since_last_start()
         summary = (f"{len(touched)} item(s) touched: {', '.join(touched)}"
                    if touched else "no items touched")
-    return runlog.log(f"run finished: {summary}")
+    line = runlog.log(f"run finished: {summary}")
+    try:
+        schedule.finish(outcome, summary)
+    except Exception as exc:
+        runlog.log(f"schedule status publish failed: {type(exc).__name__}: {exc}")
+    return line
 
 
 def _git(repo_dir: Path, *args: str) -> str:
@@ -118,6 +123,20 @@ def check_stale(item_id: str) -> dict:
         return {"itemId": item_id, "repoId": repo_id, "found": False,
                 "note": f"repo path {repo_dir} does not exist on disk"}
 
+    current_branch = _git(repo_dir, "branch", "--show-current")
+    current_revision = _git(repo_dir, "rev-parse", "HEAD")
+    status = _git(repo_dir, "status", "--porcelain")
+    run_data = None
+    if item.get("lastRunId"):
+        run_doc = (items_mod._items().document(item_id).collection("runs")
+                   .document(item["lastRunId"]).get())
+        run_data = run_doc.to_dict() if run_doc.exists else None
+    starting_revision = ((run_data or {}).get("checkout") or {}).get("startingRevision")
+    commits_since_start = None
+    if starting_revision:
+        ahead = _git(repo_dir, "log", "--oneline", f"{starting_revision}..HEAD")
+        commits_since_start = len(ahead.splitlines()) if ahead else 0
+
     branch_pattern = f"devloop/{item_id}-*"
     # `git branch --list` prefixes the current branch with "* " and a branch
     # checked out in another worktree with "+ " — strip either.
@@ -127,8 +146,17 @@ def check_stale(item_id: str) -> dict:
         if b.strip()
     ]
     if not branches:
-        return {"itemId": item_id, "repoId": repo_id, "found": False,
-                "note": "no devloop/<id>-* branch found"}
+        return {
+            "itemId": item_id,
+            "repoId": repo_id,
+            "found": bool(status) or bool(commits_since_start),
+            "branch": current_branch,
+            "currentRevision": current_revision,
+            "startingRevision": starting_revision,
+            "commitsSinceRunStart": commits_since_start,
+            "hasUncommittedChanges": bool(status),
+            "note": "inspected the existing checkout; no legacy devloop branch found",
+        }
 
     branch = branches[0]
     default_branch = "main" if _git(repo_dir, "rev-parse", "--verify", "main") else "master"

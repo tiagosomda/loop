@@ -2,7 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["outcome", "summary", "filesChanged", "verification"],
+  "required": [
+    "outcome",
+    "summary",
+    "filesChanged",
+    "verification",
+    "providerReference",
+    "metadata"
+  ],
   "properties": {
     "outcome": {
       "enum": ["succeeded", "needs-review", "failed", "timed-out", "cancelled"]
@@ -11,6 +18,10 @@
     "filesChanged": {"type": "array", "items": {"type": "string"}},
     "verification": {"type": "array", "items": {"type": "string"}},
     "providerReference": {"type": ["string", "null"]},
-    "metadata": {"type": "object"}
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {}
+    }
   }
 }

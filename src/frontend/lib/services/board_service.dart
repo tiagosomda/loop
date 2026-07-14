@@ -183,13 +183,15 @@ class BoardService {
     return count;
   }
 
-  Future<void> setModelEffort(
+  Future<void> setRoutingPreferences(
     String itemId, {
-    String? model,
-    String? effortLevel,
+    String? requestedProvider,
+    String? requestedModel,
+    String? requestedEffort,
   }) => _items.doc(itemId).update({
-    'model': model,
-    'effortLevel': effortLevel,
+    'requestedProvider': requestedProvider,
+    'requestedModel': requestedModel,
+    'requestedEffort': requestedEffort,
     'updatedAt': FieldValue.serverTimestamp(),
   });
 

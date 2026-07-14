@@ -170,6 +170,11 @@ class _ItemHeader extends StatelessWidget {
                   ],
                 ),
               ),
+              if (item.status == 'open')
+                TextButton(
+                  onPressed: () => _editRoutingPreferences(context, item),
+                  child: const Text('Customize'),
+                ),
             ],
           ),
           StreamBuilder<AgentRun?>(
@@ -180,7 +185,7 @@ class _ItemHeader extends StatelessWidget {
               return Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
-                  'Assigned: ${run.provider} · ${run.model} · ${run.effort}',
+                  routingAssignmentSummary(run),
                   style: TextStyle(fontSize: 12, color: muted),
                 ),
               );
@@ -203,6 +208,105 @@ class _ItemHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> _editRoutingPreferences(
+  BuildContext context,
+  ActionItem item,
+) async {
+  final board = context.read<BoardService>();
+  var provider = item.requestedProvider;
+  var model = item.requestedModel;
+  var effort = item.requestedEffort;
+  final result = await showDialog<List<String?>>(
+    context: context,
+    builder: (context) => StreamBuilder<RoutingCatalog>(
+      stream: board.routingCatalog(),
+      builder: (context, snapshot) {
+        final catalog =
+            snapshot.data ??
+            const RoutingCatalog(catalogVersion: '', targets: []);
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final models = catalog.modelsForProvider(provider);
+            final efforts = catalog.effortsForProvider(provider);
+            return AlertDialog(
+              title: const Text('Customize routing'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String?>(
+                    initialValue: provider,
+                    decoration: const InputDecoration(labelText: 'Provider'),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('Auto')),
+                      for (final value in catalog.providers)
+                        DropdownMenuItem(value: value, child: Text(value)),
+                    ],
+                    onChanged: (value) => setDialogState(() {
+                      provider = value;
+                      if (!catalog.modelsForProvider(value).contains(model)) {
+                        model = null;
+                      }
+                      if (!catalog.effortsForProvider(value).contains(effort)) {
+                        effort = null;
+                      }
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String?>(
+                    key: ValueKey('edit-model-$provider-$model'),
+                    initialValue: model,
+                    decoration: const InputDecoration(labelText: 'Model'),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('Auto')),
+                      for (final value in models)
+                        DropdownMenuItem(value: value, child: Text(value)),
+                    ],
+                    onChanged: models.isEmpty
+                        ? null
+                        : (value) => setDialogState(() => model = value),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String?>(
+                    key: ValueKey('edit-effort-$provider-$effort'),
+                    initialValue: effort,
+                    decoration: const InputDecoration(labelText: 'Effort'),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('Auto')),
+                      for (final value in efforts)
+                        DropdownMenuItem(value: value, child: Text(value)),
+                    ],
+                    onChanged: efforts.isEmpty
+                        ? null
+                        : (value) => setDialogState(() => effort = value),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () =>
+                      Navigator.pop(context, [provider, model, effort]),
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    ),
+  );
+  if (result == null) return;
+  await board.setRoutingPreferences(
+    item.id,
+    requestedProvider: result[0],
+    requestedModel: result[1],
+    requestedEffort: result[2],
+  );
 }
 
 String _requestedRoutingSummary(ActionItem item) {
@@ -363,11 +467,6 @@ class _RoutingEventRow extends StatelessWidget {
     final color = Theme.of(
       context,
     ).colorScheme.onSurface.withValues(alpha: 0.6);
-    final assignment = [
-      message.provider,
-      message.model,
-      message.effort,
-    ].whereType<String>().join(' · ');
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -376,7 +475,7 @@ class _RoutingEventRow extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Text(
-              '${message.routingState == 'resumed' ? 'Resumed' : 'Routed to'} $assignment',
+              routingEventLabel(message),
               style: TextStyle(fontSize: 12, color: color),
             ),
           ),

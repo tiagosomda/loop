@@ -8,8 +8,6 @@ const itemStatuses = [
   'closed',
 ];
 
-const effortOptions = ['default', 'low', 'medium', 'high', 'max'];
-
 DateTime? _ts(dynamic v) => v is Timestamp ? v.toDate() : null;
 
 class ActionItem {
@@ -136,6 +134,18 @@ class RoutingCatalog {
 
   List<String> get providers =>
       targets.map((target) => target.adapter).toSet().toList(growable: false);
+
+  List<String> modelsForProvider(String? adapter) => targets
+      .where((target) => adapter == null || target.adapter == adapter)
+      .expand((target) => target.models)
+      .toSet()
+      .toList(growable: false);
+
+  List<String> effortsForProvider(String? adapter) => targets
+      .where((target) => adapter == null || target.adapter == adapter)
+      .expand((target) => target.effortLevels)
+      .toSet()
+      .toList(growable: false);
 }
 
 /// Whether [item] belongs on the board for the current archived toggle:
@@ -272,6 +282,19 @@ class AgentRun {
   }
 }
 
+String routingAssignmentSummary(AgentRun run) =>
+    'Assigned: ${run.provider} · ${run.model} · ${run.effort}';
+
+String routingEventLabel(ThreadMessage message) {
+  final assignment = [
+    message.provider,
+    message.model,
+    message.effort,
+  ].whereType<String>().join(' · ');
+  final action = message.routingState == 'resumed' ? 'Resumed' : 'Routed to';
+  return assignment.isEmpty ? action : '$action $assignment';
+}
+
 /// The image attachments available to a thread gallery, in reading order.
 ///
 /// Messages are supplied oldest-first by the thread query.
@@ -321,13 +344,70 @@ class RepoInfo {
 class ScheduleInfo {
   final List<String> times;
   final DateTime? lastRunAt;
+  final DateTime? lastFinishedAt;
   final DateTime? updatedAt;
+  final String scheduler;
+  final String? lastOutcome;
+  final String? lastSummary;
+  final bool routerAvailable;
+  final String? routerReason;
+  final List<ProviderHealth> providers;
 
-  ScheduleInfo({required this.times, this.lastRunAt, this.updatedAt});
+  ScheduleInfo({
+    required this.times,
+    this.lastRunAt,
+    this.lastFinishedAt,
+    this.updatedAt,
+    this.scheduler = 'launchd',
+    this.lastOutcome,
+    this.lastSummary,
+    this.routerAvailable = false,
+    this.routerReason,
+    this.providers = const [],
+  });
 
   factory ScheduleInfo.fromMap(Map<String, dynamic>? d) => ScheduleInfo(
     times: [for (final t in (d?['times'] as List? ?? [])) t.toString()],
     lastRunAt: _ts(d?['lastRunAt']),
+    lastFinishedAt: _ts(d?['lastFinishedAt']),
     updatedAt: _ts(d?['updatedAt']),
+    scheduler: d?['scheduler'] ?? 'launchd',
+    lastOutcome: d?['lastOutcome'],
+    lastSummary: d?['lastSummary'],
+    routerAvailable: d?['routerHealth']?['available'] == true,
+    routerReason: d?['routerHealth']?['reason'],
+    providers: [
+      for (final provider in (d?['providers'] as List? ?? []))
+        ProviderHealth.fromMap(Map<String, dynamic>.from(provider)),
+    ],
   );
+}
+
+class ProviderHealth {
+  final String targetId;
+  final String adapter;
+  final bool enabled;
+  final bool available;
+  final String? reason;
+
+  const ProviderHealth({
+    required this.targetId,
+    required this.adapter,
+    required this.enabled,
+    required this.available,
+    this.reason,
+  });
+
+  factory ProviderHealth.fromMap(Map<String, dynamic> map) {
+    final availability = Map<String, dynamic>.from(
+      map['availability'] as Map? ?? const {},
+    );
+    return ProviderHealth(
+      targetId: map['targetId'] ?? '',
+      adapter: map['adapter'] ?? '',
+      enabled: map['enabled'] == true,
+      available: availability['available'] == true,
+      reason: availability['reason'],
+    );
+  }
 }

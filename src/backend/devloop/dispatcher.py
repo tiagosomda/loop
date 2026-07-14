@@ -28,12 +28,18 @@ def checkout_preflight(repo_dir: Path) -> dict[str, Any]:
         return result.stdout.strip()
 
     branch = git("branch", "--show-current")
+    if branch != "main":
+        raise DispatchError(
+            f"repository is on {branch!r}, not main; refusing unattended dispatch"
+        )
+    revision = git("rev-parse", "HEAD")
     dirty = git("status", "--porcelain")
     if dirty:
         raise DispatchError("repository has uncommitted changes; refusing unattended dispatch")
     return {
         "path": str(repo_dir.resolve()),
         "branch": branch,
+        "startingRevision": revision,
         "usesWorktree": False,
         "gitPolicy": "existing-checkout-main-by-default",
     }
@@ -42,8 +48,7 @@ def checkout_preflight(repo_dir: Path) -> dict[str, Any]:
 def start(item_id: str, decision: dict[str, Any], adapter: ProviderAdapter, *,
           load_item: Callable[[str], dict[str, Any]] = items.show_item,
           load_repo: Callable[[str], dict[str, Any] | None] = repos.get,
-          create_run: Callable[..., str] = runs.create_assignment,
-          claim: Callable[[str], None] = items.claim_item,
+          create_run: Callable[..., str] = runs.create_claimed_assignment,
           post_event: Callable[..., str] = runs.post_routing_event,
           finalize: Callable[..., None] | None = None,
           preflight: Callable[[Path], dict[str, Any]] = checkout_preflight,
@@ -84,13 +89,15 @@ def start(item_id: str, decision: dict[str, Any], adapter: ProviderAdapter, *,
         raise DispatchError(f"repository {item.get('repoId')!r} not found")
     checkout = preflight((config.DEV_ROOT / repo["path"]).resolve())
 
-    run_id = create_run(
-        item_id, decision,
-        catalog_version=active_catalog["catalogVersion"],
-        router_model="gemma-3-4b-it",
-        post_event=False,
-    )
-    claim(item_id)
+    try:
+        run_id = create_run(
+            item_id, decision,
+            catalog_version=active_catalog["catalogVersion"],
+            router_model="gemma-3-4b-it",
+            checkout=checkout,
+        )
+    except runs.RunConflict as exc:
+        raise DispatchError(str(exc)) from exc
     assignment = runs.run_payload(
         decision, catalog_version=active_catalog["catalogVersion"],
         router_model="gemma-3-4b-it",
@@ -98,6 +105,7 @@ def start(item_id: str, decision: dict[str, Any], adapter: ProviderAdapter, *,
     post_event(item_id, run_id, assignment)
     task = {
         "itemId": item_id,
+        "runId": run_id,
         "title": item.get("title"),
         "request": item.get("messages", []),
         "repository": checkout,
@@ -120,11 +128,6 @@ def _finalize(item_id: str, run_id: str, result: WorkerResult) -> None:
                     if result.verification else "")
     files = ("\nFiles: " + ", ".join(result.files_changed)
              if result.files_changed else "")
-    items.post_message(
-        item_id,
-        f"{result.summary}{files}{verification}",
-        author="agent",
-    )
     item_ref = items._items().document(item_id)
     run_ref = item_ref.collection("runs").document(run_id)
     batch = items.fs.db().batch()
@@ -137,3 +140,16 @@ def _finalize(item_id: str, run_id: str, result: WorkerResult) -> None:
     status = "needs-review" if result.outcome in {"succeeded", "needs-review"} else "in-progress"
     batch.update(item_ref, {"status": status, "updatedAt": firestore.SERVER_TIMESTAMP})
     batch.commit()
+    items.runlog.log(f"item {item_id} -> {status}")
+    try:
+        items.post_message(
+            item_id,
+            f"{result.summary}{files}{verification}",
+            author="agent",
+        )
+    except Exception as exc:
+        run_ref.update({
+            "writeBackError": f"{type(exc).__name__}: {exc}",
+            "updatedAt": firestore.SERVER_TIMESTAMP,
+        })
+        raise

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -41,7 +42,15 @@ def build_context(item_id: str) -> dict[str, Any]:
     item = items.show_item(item_id)
     repo_id = item.get("repoId")
     repo = repos.get(repo_id) if repo_id else None
-    workers = targets.enabled_available_workers()
+    requested = {
+        "provider": item.get("requestedProvider"),
+        "model": item.get("requestedModel", item.get("model")),
+        "effort": item.get("requestedEffort", item.get("effortLevel")),
+    }
+    workers = [
+        target for target in targets.enabled_available_workers()
+        if _matches_request(target, requested)
+    ]
     return {
         "schemaVersion": 1,
         "item": {
@@ -57,13 +66,18 @@ def build_context(item_id: str) -> dict[str, Any]:
             "path": repo.get("path") if repo else None,
             "host": repo.get("host") if repo else None,
         },
-        "requested": {
-            "provider": item.get("requestedProvider"),
-            "model": item.get("requestedModel", item.get("model")),
-            "effort": item.get("requestedEffort", item.get("effortLevel")),
-        },
+        "requested": requested,
         "allowedTargets": workers,
     }
+
+
+def _matches_request(target: dict[str, Any], requested: dict[str, Any]) -> bool:
+    return (
+        (requested.get("provider") in (None, target["adapter"])) and
+        (requested.get("model") is None or requested["model"] in target["models"]) and
+        (requested.get("effort") is None or
+         requested["effort"] in target["effortLevels"])
+    )
 
 
 def _request_text(item: dict[str, Any]) -> str:
@@ -139,9 +153,13 @@ def validate_decision(context: dict[str, Any], decision: Any) -> None:
         raise RoutingError("decision effort is not allowed for target")
     if decision["confidence"] not in {"low", "medium", "high"}:
         raise RoutingError("invalid confidence")
+    confidence_order = {"low": 0, "medium": 1, "high": 2}
+    if confidence_order[decision["confidence"]] < confidence_order[config.ROUTER_MIN_CONFIDENCE]:
+        raise RoutingError("needs-human-routing: router confidence is too low")
     reasons = decision["reasonCodes"]
     if (not isinstance(reasons, list) or len(reasons) > 5 or
-            not all(isinstance(reason, str) and reason for reason in reasons)):
+            not all(isinstance(reason, str) and
+                    re.fullmatch(r"[a-z0-9-]+", reason) for reason in reasons)):
         raise RoutingError("invalid reasonCodes")
     requested = context.get("requested") or {}
     checks = {

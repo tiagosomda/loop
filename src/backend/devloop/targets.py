@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -104,9 +105,20 @@ def probe(target: dict[str, Any], timeout: float = 1.0) -> dict[str, Any]:
     if not isinstance(executable, str) or not executable:
         return {"available": False, "reason": "missing-executable-configuration"}
     path = shutil.which(executable)
-    return ({"available": True, "reason": "executable-found"}
-            if path else
-            {"available": False, "reason": "executable-not-found"})
+    if not path:
+        return {"available": False, "reason": "executable-not-found"}
+    if adapter == "codex":
+        try:
+            status = subprocess.run(
+                [path, "login", "status"], text=True, capture_output=True,
+                timeout=max(timeout, 1.0),
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return {"available": False, "reason": "authentication-check-failed"}
+        if status.returncode:
+            return {"available": False, "reason": "not-authenticated"}
+        return {"available": True, "reason": "authenticated"}
+    return {"available": True, "reason": "executable-found"}
 
 
 def safe_projection(*, role: str | None = None, enabled_only: bool = False,

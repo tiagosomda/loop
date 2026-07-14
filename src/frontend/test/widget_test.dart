@@ -138,6 +138,108 @@ void main() {
     expect(catalog.providers, ['codex']);
   });
 
+  test('automatic provider exposes the union of catalog options', () {
+    final catalog = RoutingCatalog.fromMap({
+      'catalogVersion': 'test',
+      'targets': [
+        {
+          'targetId': 'codex-a',
+          'adapter': 'codex',
+          'location': 'cloud',
+          'models': ['default', 'codex-special'],
+          'effortLevels': ['low', 'high'],
+        },
+        {
+          'targetId': 'codex-b',
+          'adapter': 'codex',
+          'location': 'cloud',
+          'models': ['default', 'codex-second'],
+          'effortLevels': ['medium'],
+        },
+        {
+          'targetId': 'claude',
+          'adapter': 'claude-code',
+          'location': 'cloud',
+          'models': ['sonnet'],
+          'effortLevels': ['high'],
+        },
+      ],
+    });
+    expect(catalog.modelsForProvider(null), [
+      'default',
+      'codex-special',
+      'codex-second',
+      'sonnet',
+    ]);
+    expect(catalog.modelsForProvider('codex'), [
+      'default',
+      'codex-special',
+      'codex-second',
+    ]);
+    expect(catalog.effortsForProvider('codex'), ['low', 'high', 'medium']);
+  });
+
+  test('routing labels render assignment and lifecycle state', () {
+    const run = AgentRun(
+      id: 'run',
+      state: 'running',
+      targetId: 'codex-standard',
+      provider: 'codex',
+      model: 'default',
+      effort: 'high',
+    );
+    expect(routingAssignmentSummary(run), 'Assigned: codex · default · high');
+    expect(
+      routingEventLabel(
+        ThreadMessage(
+          id: 'route',
+          author: 'system',
+          text: '',
+          attachments: const [],
+          kind: 'routing',
+          routingState: 'resumed',
+          provider: 'codex',
+          model: 'default',
+          effort: 'high',
+        ),
+      ),
+      'Resumed codex · default · high',
+    );
+  });
+
+  test('schedule health is parsed from data-driven provider state', () {
+    final schedule = ScheduleInfo.fromMap({
+      'times': ['00:15'],
+      'scheduler': 'launchd',
+      'routerHealth': {'available': true, 'reason': 'healthy'},
+      'providers': [
+        {
+          'targetId': 'codex-standard',
+          'adapter': 'codex',
+          'enabled': true,
+          'availability': {'available': true, 'reason': 'authenticated'},
+        },
+        {
+          'targetId': 'claude-standard',
+          'adapter': 'claude-code',
+          'enabled': false,
+          'availability': {
+            'available': false,
+            'reason': 'disabled-by-configuration',
+          },
+        },
+      ],
+    });
+    expect(schedule.scheduler, 'launchd');
+    expect(schedule.routerAvailable, isTrue);
+    expect(schedule.providers.map((provider) => provider.adapter), [
+      'codex',
+      'claude-code',
+    ]);
+    expect(schedule.providers.first.available, isTrue);
+    expect(schedule.providers.last.enabled, isFalse);
+  });
+
   test('routing events do not contribute attachments to the gallery', () {
     final messages = [
       ThreadMessage(

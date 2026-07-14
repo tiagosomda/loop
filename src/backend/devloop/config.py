@@ -26,6 +26,7 @@ ITEM_STATUSES = ("open", "in-progress", "needs-review", "completed", "closed")
 
 # Local times the scheduled agent wakes up (see docs/design.md).
 SCHEDULE_TIMES = ("00:15", "05:15", "10:15", "15:15", "20:15")
+ROUTER_MIN_CONFIDENCE = "medium"
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DATA_DIR = REPO_ROOT / "data"

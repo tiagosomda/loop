@@ -225,9 +225,8 @@ class _RoutingPreferences extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selected = catalog.targetForAdapter(provider);
-    final models = selected?.models ?? const <String>[];
-    final efforts = selected?.effortLevels ?? effortOptions.skip(1).toList();
+    final models = catalog.modelsForProvider(provider);
+    final efforts = catalog.effortsForProvider(provider);
     return ExpansionTile(
       key: const ValueKey('routing-preferences'),
       initiallyExpanded: expanded,
@@ -260,7 +259,7 @@ class _RoutingPreferences extends StatelessWidget {
             for (final value in models)
               DropdownMenuItem(value: value, child: Text(value)),
           ],
-          onChanged: selected == null ? null : onModel,
+          onChanged: models.isEmpty ? null : onModel,
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<String?>(

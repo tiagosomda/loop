@@ -61,6 +61,28 @@ class RouterTests(unittest.TestCase):
         with self.assertRaisesRegex(router.RoutingError, "unexpected fields"):
             router.validate_decision(context(), value)
 
+    def test_low_confidence_abstains(self):
+        value = decision()
+        value["confidence"] = "low"
+        with self.assertRaisesRegex(router.RoutingError, "needs-human-routing"):
+            router.validate_decision(context(), value)
+
+    def test_invalid_reason_code_is_rejected(self):
+        value = decision()
+        value["reasonCodes"] = ["private reasoning"]
+        with self.assertRaisesRegex(router.RoutingError, "invalid reasonCodes"):
+            router.validate_decision(context(), value)
+
+    def test_request_constraints_filter_targets_before_inference(self):
+        self.assertTrue(router._matches_request(
+            context()["allowedTargets"][0],
+            {"provider": "codex", "model": "default", "effort": "high"},
+        ))
+        self.assertFalse(router._matches_request(
+            context()["allowedTargets"][0],
+            {"provider": "claude-code", "model": None, "effort": None},
+        ))
+
     @mock.patch("devloop.router._router_target")
     @mock.patch("devloop.router.requests.post")
     def test_decide_uses_schema_constrained_local_endpoint(self, post, target):

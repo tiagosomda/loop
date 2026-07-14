@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable
 
-from . import config, dispatcher, router, run, targets
+from . import config, dispatcher, items, router, run, targets
 from .adapters import for_target
 
 
@@ -30,6 +30,20 @@ def single_instance(path: Path | None = None):
         handle.close()
 
 
+def pause_for_recovery(item: dict[str, Any]) -> dict[str, Any]:
+    """Surface stale evidence and unblock later open items without rerouting."""
+    evidence = run.check_stale(item["id"])
+    items.post_message(
+        item["id"],
+        "Autonomous recovery paused this prior run for review. No new provider "
+        "was selected and existing repository work was left untouched.\n\n"
+        f"Recovery evidence: {evidence}",
+        author="agent",
+    )
+    items.set_status(item["id"], "needs-review")
+    return {"itemId": item["id"], "outcome": "needs-human-recovery"}
+
+
 def execute(*, start_run: Callable[[], Any] = run.start,
             next_item: Callable[[], dict[str, Any] | None] = run.next_item,
             end_run: Callable[..., str] = run.end,
@@ -38,22 +52,25 @@ def execute(*, start_run: Callable[[], Any] = run.start,
             dispatch: Callable[..., Any] = dispatcher.start,
             load_catalog: Callable[[], dict[str, Any]] = targets.load,
             adapter_factory: Callable[[dict[str, Any]], Any] = for_target,
+            recover: Callable[[dict[str, Any]], dict[str, Any]] = pause_for_recovery,
             lock: Callable[[], Any] = single_instance,
             max_items: int | None = None) -> dict[str, Any]:
     processed: list[dict[str, Any]] = []
     with lock():
         started = False
+        failure: Exception | None = None
         try:
-            start_run()
+            # Once the local invocation owns the lock it must leave an end
+            # trace even when bootstrap fails partway through.
             started = True
+            start_run()
             while max_items is None or len(processed) < max_items:
                 item = next_item()
                 if item is None:
                     break
                 if item.get("status") == "in-progress":
-                    raise RuntimeError(
-                        f"item {item['id']} requires explicit stale-run recovery"
-                    )
+                    processed.append(recover(item))
+                    continue
                 context = build_context(item["id"])
                 decision = choose(context)
                 catalog = load_catalog()
@@ -72,7 +89,16 @@ def execute(*, start_run: Callable[[], Any] = run.start,
                     "itemId": item["id"], "runId": run_id,
                     "outcome": result.outcome,
                 })
+        except Exception as exc:
+            failure = exc
+            raise
         finally:
             if started:
-                end_run()
+                if failure is None:
+                    end_run()
+                else:
+                    end_run(
+                        note=f"failed: {type(failure).__name__}: {failure}",
+                        outcome="failed",
+                    )
     return {"processed": processed, "count": len(processed)}
