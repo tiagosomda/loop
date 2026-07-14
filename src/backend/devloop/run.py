@@ -11,7 +11,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from . import config, items as items_mod, repos as repos_mod, runlog, schedule
+from . import config, items as items_mod, repos as repos_mod, runlog, schedule, targets
 
 _QUEUE_STATUSES = ("in-progress", "open")
 
@@ -50,7 +50,8 @@ def start() -> dict:
     return the initial queue."""
     schedule.update(mark_run=True)
     crawl_result = repos_mod.crawl()
-    return {"repos": crawl_result, "queue": queue()}
+    target_projection = targets.publish()
+    return {"repos": crawl_result, "targets": target_projection, "queue": queue()}
 
 
 def next_item() -> dict | None:

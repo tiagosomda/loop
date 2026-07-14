@@ -17,4 +17,15 @@ Status: in-progress
 
 ## Completion evidence
 
-Pending.
+In progress:
+
+- Thirty backend tests pass.
+- Flutter analysis reports no issues and all 26 Flutter tests pass.
+- Both LaunchAgent plists pass `plutil -lint`.
+- The llama-server LaunchAgent is installed and healthy. A controlled
+  termination replaced PID 20835 with PID 20873 and returned healthy again,
+  proving unconditional restart supervision.
+- Operational install, inspection, manual-run, disable, and rollback commands
+  are documented in `ops/launchd/README.md`.
+- The orchestrator LaunchAgent remains intentionally unloaded because no
+  Firebase service-account credential is currently available to this checkout.

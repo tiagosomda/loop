@@ -75,6 +75,9 @@ def start(item_id: str, decision: dict[str, Any], adapter: ProviderAdapter, *,
     router.validate_decision(validation_context, decision)
     if selected_target is None:
         raise DispatchError("selected target is not enabled")
+    availability = targets.probe(selected_target)
+    if not availability["available"]:
+        raise DispatchError(f"selected target became unavailable: {availability['reason']}")
 
     repo = load_repo(item.get("repoId"))
     if not repo:
@@ -113,6 +116,15 @@ def start(item_id: str, decision: dict[str, Any], adapter: ProviderAdapter, *,
 
 
 def _finalize(item_id: str, run_id: str, result: WorkerResult) -> None:
+    verification = ("\nVerification: " + "; ".join(result.verification)
+                    if result.verification else "")
+    files = ("\nFiles: " + ", ".join(result.files_changed)
+             if result.files_changed else "")
+    items.post_message(
+        item_id,
+        f"{result.summary}{files}{verification}",
+        author="agent",
+    )
     item_ref = items._items().document(item_id)
     run_ref = item_ref.collection("runs").document(run_id)
     batch = items.fs.db().batch()

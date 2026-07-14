@@ -23,11 +23,17 @@ python3 -m venv .venv
 .venv/bin/python devloop.py repos crawl            # sync dev/ repos to Firestore
 .venv/bin/python devloop.py schedule update --mark-run
 .venv/bin/python devloop.py targets list --role worker --enabled-only
+.venv/bin/python devloop.py route decide <item-id> --shadow
+.venv/bin/python devloop.py run autonomous --max-items 1
 ```
 
 The target catalog lives in `config/targets.json`. Provider and model choices
 are data-driven: safe projections omit command paths and local endpoints, and
 `--enabled-only` excludes disabled providers such as the initial Claude target.
+
+Local scheduling and llama-server supervision are documented in
+`../../ops/launchd/README.md`. Codex and Claude schedules are not part of the
+autonomous workflow.
 
 ## Shared security rules — read before touching
 
