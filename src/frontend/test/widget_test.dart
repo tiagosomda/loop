@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:dev_loop/models/models.dart';
 import 'package:dev_loop/services/board_service.dart';
 import 'package:dev_loop/widgets/brand_logo.dart';
@@ -242,6 +244,47 @@ void main() {
       final now = DateTime(2026, 7, 13, 10, 15);
 
       expect(isNearScheduledTime(now, const ['noon', '25:00']), isFalse);
+    });
+  });
+
+  group('tappable logo burst spin', () {
+    // Regression test for the "logged out login issue" polish request: the
+    // signed-out screen's big logo should spin slowly on its own, and a tap
+    // should layer a noticeably faster burst on top of that idle rotation.
+    testWidgets('tapping spins the logo faster than its idle rate',
+        (tester) async {
+      await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(
+          body: Center(child: SpinningDevLoopLogo(tappable: true)),
+        ),
+      ));
+      await tester.pump();
+
+      double angleOf() {
+        final transform = tester.widget<Transform>(find.descendant(
+          of: find.byType(SpinningDevLoopLogo),
+          matching: find.byType(Transform),
+        ));
+        final m = transform.transform.storage;
+        return math.atan2(m[1], m[0]);
+      }
+
+      final beforeIdle = angleOf();
+      await tester.pump(const Duration(milliseconds: 100));
+      final idleDelta = (angleOf() - beforeIdle).abs();
+
+      await tester.tap(find.byType(SpinningDevLoopLogo));
+      await tester.pump();
+      final beforeBurst = angleOf();
+      await tester.pump(const Duration(milliseconds: 100));
+      final burstDelta = (angleOf() - beforeBurst).abs();
+
+      expect(burstDelta, greaterThan(idleDelta * 2));
+
+      // The logo spins forever (both the idle repeat and, briefly, the
+      // burst), so unmount it rather than pumpAndSettle to let its
+      // AnimationControllers and timers get disposed cleanly.
+      await tester.pumpWidget(const SizedBox());
     });
   });
 }

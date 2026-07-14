@@ -17,7 +17,7 @@ class LoggedOutScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
-        title: const BrandTitle(),
+        title: const BrandTitle(showLogo: false),
         actions: [
           const ThemeToggleButton(),
           IconButton(
@@ -36,7 +36,7 @@ class LoggedOutScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const DevLoopLogo(size: 88),
+                const SpinningDevLoopLogo(size: 220, tappable: true),
                 const SizedBox(height: 24),
                 Text(
                   wrongAccount
