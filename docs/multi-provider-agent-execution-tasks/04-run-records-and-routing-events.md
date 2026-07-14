@@ -1,6 +1,6 @@
 # Task 04: Run records and routing events
 
-Status: in-progress
+Status: completed
 
 ## Scope
 
@@ -16,4 +16,10 @@ Status: in-progress
 
 ## Completion evidence
 
-Pending.
+- Added per-item run assignment records and `lastRunId` references without
+  mutating item request fields.
+- Added transactionally idempotent routing event documents with deterministic
+  IDs derived from run and state.
+- Added Flutter run/event models, latest-assignment display, and compact
+  routing timeline rows.
+- Nineteen backend tests, Flutter analysis, and 26 Flutter tests pass.

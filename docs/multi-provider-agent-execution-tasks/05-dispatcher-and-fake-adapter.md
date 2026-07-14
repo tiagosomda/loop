@@ -1,6 +1,6 @@
 # Task 05: Dispatcher and fake adapter
 
-Status: pending
+Status: in-progress
 
 ## Scope
 

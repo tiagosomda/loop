@@ -29,6 +29,7 @@ class ActionItem {
   final bool archived;
   final DateTime? archivedAt;
   final double? order;
+  final String? lastRunId;
 
   ActionItem({
     required this.id,
@@ -47,6 +48,7 @@ class ActionItem {
     this.archived = false,
     this.archivedAt,
     this.order,
+    this.lastRunId,
   });
 
   factory ActionItem.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -68,6 +70,7 @@ class ActionItem {
       archived: d['archived'] == true,
       archivedAt: _ts(d['archivedAt']),
       order: (d['order'] as num?)?.toDouble(),
+      lastRunId: d['lastRunId'],
     );
   }
 }
@@ -195,6 +198,12 @@ class ThreadMessage {
   final List<Attachment> attachments;
   final DateTime? createdAt;
   final DateTime? editedAt;
+  final String kind;
+  final String? runId;
+  final String? routingState;
+  final String? provider;
+  final String? model;
+  final String? effort;
 
   ThreadMessage({
     required this.id,
@@ -203,6 +212,12 @@ class ThreadMessage {
     required this.attachments,
     this.createdAt,
     this.editedAt,
+    this.kind = 'message',
+    this.runId,
+    this.routingState,
+    this.provider,
+    this.model,
+    this.effort,
   });
 
   factory ThreadMessage.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -217,6 +232,42 @@ class ThreadMessage {
       ],
       createdAt: _ts(d['createdAt']),
       editedAt: _ts(d['editedAt']),
+      kind: d['kind'] ?? 'message',
+      runId: d['runId'],
+      routingState: d['state'],
+      provider: d['provider'],
+      model: d['model'],
+      effort: d['effort'],
+    );
+  }
+}
+
+class AgentRun {
+  final String id;
+  final String state;
+  final String targetId;
+  final String provider;
+  final String model;
+  final String effort;
+
+  const AgentRun({
+    required this.id,
+    required this.state,
+    required this.targetId,
+    required this.provider,
+    required this.model,
+    required this.effort,
+  });
+
+  factory AgentRun.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data() ?? {};
+    return AgentRun(
+      id: doc.id,
+      state: data['state'] ?? '',
+      targetId: data['targetId'] ?? '',
+      provider: data['provider'] ?? '',
+      model: data['model'] ?? '',
+      effort: data['effort'] ?? '',
     );
   }
 }
@@ -229,8 +280,9 @@ class ThreadMessage {
 /// uploads spread across replies.
 List<Attachment> imageAttachmentsInThread(Iterable<ThreadMessage> messages) => [
   for (final message in messages)
-    for (final attachment in message.attachments)
-      if (attachment.isImage) attachment,
+    if (message.kind == 'message')
+      for (final attachment in message.attachments)
+        if (attachment.isImage) attachment,
 ];
 
 class RepoInfo {

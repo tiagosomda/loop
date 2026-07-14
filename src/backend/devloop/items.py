@@ -34,6 +34,7 @@ def _summary(doc) -> dict:
         "requestedProvider": data.get("requestedProvider"),
         "requestedModel": data.get("requestedModel", data.get("model")),
         "requestedEffort": data.get("requestedEffort", data.get("effortLevel")),
+        "lastRunId": data.get("lastRunId"),
         "createdAt": _iso(data.get("createdAt")),
         "updatedAt": _iso(data.get("updatedAt")),
         "lastAgentRunAt": _iso(data.get("lastAgentRunAt")),

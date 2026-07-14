@@ -69,6 +69,17 @@ class BoardService {
       .snapshots()
       .map((d) => d.exists ? ActionItem.fromDoc(d) : null);
 
+  Stream<AgentRun?> latestRun(ActionItem item) {
+    final runId = item.lastRunId;
+    if (runId == null) return Stream.value(null);
+    return _items
+        .doc(item.id)
+        .collection('runs')
+        .doc(runId)
+        .snapshots()
+        .map((doc) => doc.exists ? AgentRun.fromDoc(doc) : null);
+  }
+
   Stream<List<ThreadMessage>> messages(String itemId) => _items
       .doc(itemId)
       .collection('messages')

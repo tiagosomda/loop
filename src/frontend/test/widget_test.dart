@@ -138,6 +138,27 @@ void main() {
     expect(catalog.providers, ['codex']);
   });
 
+  test('routing events do not contribute attachments to the gallery', () {
+    final messages = [
+      ThreadMessage(
+        id: 'routing',
+        author: 'system',
+        text: '',
+        attachments: [
+          Attachment(
+            name: 'ignored.png',
+            storagePath: 'x',
+            contentType: 'image/png',
+            size: 1,
+          ),
+        ],
+        kind: 'routing',
+        provider: 'codex',
+      ),
+    ];
+    expect(imageAttachmentsInThread(messages), isEmpty);
+  });
+
   group('literal status filtering', () {
     final item = ActionItem(id: 'x', title: 't', repoId: 'r', status: 'open');
 

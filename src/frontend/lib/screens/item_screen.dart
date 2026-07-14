@@ -172,6 +172,20 @@ class _ItemHeader extends StatelessWidget {
               ),
             ],
           ),
+          StreamBuilder<AgentRun?>(
+            stream: context.read<BoardService>().latestRun(item),
+            builder: (context, snapshot) {
+              final run = snapshot.data;
+              if (run == null) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'Assigned: ${run.provider} · ${run.model} · ${run.effort}',
+                  style: TextStyle(fontSize: 12, color: muted),
+                ),
+              );
+            },
+          ),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -322,6 +336,9 @@ class _Thread extends StatelessWidget {
           itemCount: messages.length,
           itemBuilder: (context, i) {
             final index = messages.length - 1 - i;
+            if (messages[index].kind == 'routing') {
+              return _RoutingEventRow(message: messages[index]);
+            }
             return _MessageBubble(
               itemId: itemId,
               message: messages[index],
@@ -332,6 +349,40 @@ class _Thread extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _RoutingEventRow extends StatelessWidget {
+  const _RoutingEventRow({required this.message});
+
+  final ThreadMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(
+      context,
+    ).colorScheme.onSurface.withValues(alpha: 0.6);
+    final assignment = [
+      message.provider,
+      message.model,
+      message.effort,
+    ].whereType<String>().join(' · ');
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(child: Divider(color: color.withValues(alpha: 0.35))),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              '${message.routingState == 'resumed' ? 'Resumed' : 'Routed to'} $assignment',
+              style: TextStyle(fontSize: 12, color: color),
+            ),
+          ),
+          Expanded(child: Divider(color: color.withValues(alpha: 0.35))),
+        ],
+      ),
     );
   }
 }
