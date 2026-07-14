@@ -22,4 +22,5 @@ Status: completed
   IDs derived from run and state.
 - Added Flutter run/event models, latest-assignment display, and compact
   routing timeline rows.
-- Nineteen backend tests, Flutter analysis, and 26 Flutter tests pass.
+- Deterministic event identity and frontend assignment/event labels have
+  regression coverage; all backend and frontend suites pass.

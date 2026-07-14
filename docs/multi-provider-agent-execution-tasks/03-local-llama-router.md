@@ -22,7 +22,9 @@ Status: completed
 - Added low-temperature, JSON-schema-constrained llama.cpp chat completion
   calls with strict post-generation validation.
 - Added override, target, provider, model, effort, and unexpected-field checks.
+- Added deterministic pre-inference constraint filtering, reason-code
+  validation, and low-confidence abstention.
 - Added local JSONL shadow recording with no item claim or dispatch side effect.
-- Seventeen backend tests, Flutter analysis, and 25 Flutter tests pass.
+- Backend tests and the frontend verification suite pass.
 - A live Gemma 3 4B smoke test selected the enabled Codex target with low
   effort and high confidence for a small README correction.

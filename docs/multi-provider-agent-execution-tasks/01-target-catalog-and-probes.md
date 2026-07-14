@@ -24,7 +24,7 @@ Status: completed
 - Added strict catalog validation, deterministic probes, and a secret-free
   projection in `devloop.targets`.
 - Added `devloop targets list` with role and enabled filters.
-- Seven unit tests pass, including configuration-only Claude enablement and
-  safe-field filtering.
+- Catalog tests pass, including Codex authentication readiness,
+  configuration-only Claude enablement, and safe-field filtering.
 - Live `targets list --role worker --enabled-only` returned only the available
   Codex target while Claude remained disabled.

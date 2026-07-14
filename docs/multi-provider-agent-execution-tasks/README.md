@@ -20,7 +20,13 @@ tested commit at a time.
 6. [Codex and Claude adapters](06-provider-adapters.md)
 7. [Autonomous orchestration and launchd](07-autonomous-orchestration-and-launchd.md)
 8. [Integration, operations, and rollout](08-integration-operations-and-rollout.md)
+9. [Bounded research and artifact lifecycle](09-research-and-artifacts.md)
+10. [Resumption, leases, and concurrency](10-resumption-leases-and-concurrency.md)
 
 Provider availability in the frontend is always data-driven. The UI consumes
 the enabled safe catalog projection; it contains no hard-coded Codex, Claude,
 or model visibility rules.
+
+Tasks 1–8 are the foreground, single-worker pilot. Tasks 9–10 track later
+end-state capabilities from the design document and are intentionally not
+claimed by that pilot.

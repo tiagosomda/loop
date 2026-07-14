@@ -1,9 +1,10 @@
 # dev-loop
 
 An experiment in agent-driven development: write action items (bugs, tasks,
-features) to a Firestore-backed board, and a scheduled Claude Code agent picks
-them up, works on them across the repos under `dev/`, and writes results back
-to the board. See [docs/design.md](docs/design.md).
+features) to a Firestore-backed board, and a locally scheduled,
+provider-neutral orchestrator routes them to an enabled worker, works across
+the repos under `dev/`, and writes results back to the board. See
+[docs/design.md](docs/design.md).
 
 ## Layout
 

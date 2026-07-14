@@ -20,9 +20,16 @@ Status: completed
 
 - Added a Codex adapter using non-interactive execution, stdin task delivery,
   JSONL events, a strict final-result schema, and normalized timeouts/failures.
+- Provider JSONL is retained in a trusted per-run directory, including partial
+  timeout output, and the provider thread ID is recorded when available.
+- Worker prompts explicitly prohibit board credentials, board mutation, and
+  lifecycle ownership.
 - Full access is hardcoded with
   `--dangerously-bypass-approvals-and-sandbox` inside the trusted adapter.
 - Added a Claude Code adapter boundary while keeping `claude-standard`
   disabled; it was not live-tested or invoked.
 - Gemini remains out of scope.
-- Twenty-six backend tests pass, including Codex argument and result contracts.
+- Mocked Codex and Claude argument, structured-result, and timeout contracts
+  pass. Claude remains disabled and was not live-invoked.
+- An isolated real Codex smoke run succeeded with no file changes, preserved
+  seven provider events, and captured its provider thread reference.

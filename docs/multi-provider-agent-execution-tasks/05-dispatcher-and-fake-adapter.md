@@ -18,9 +18,11 @@ Status: completed
 ## Completion evidence
 
 - Added a normalized adapter/result contract and side-effect-free fake adapter.
-- Added deterministic dispatch ordering: eligibility and Git preflight, run
-  record, claim, routing event, adapter invocation, and finalization.
-- Existing clean checkout and branch are used with no worktree; dirty
-  repositories are rejected before claim or worker execution.
+- Added deterministic dispatch ordering: Git preflight, atomic eligibility
+  recheck plus run/claim transaction, routing event, adapter invocation, and
+  durable finalization.
+- The clean existing `main` checkout is used with no worktree; dirty or
+  non-main repositories are rejected before claim or worker execution.
 - Worker exceptions become normalized failed results and still finalize.
-- Twenty-three backend contract tests pass.
+- Write-back failures are recorded on the durable run instead of erasing the
+  worker outcome, and the backend contract suite passes.

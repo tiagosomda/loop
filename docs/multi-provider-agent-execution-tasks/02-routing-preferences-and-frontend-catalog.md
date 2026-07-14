@@ -24,9 +24,11 @@ Status: completed
   `dev-loop/app/meta/targets`.
 - The new-item screen defaults to Automatic and loads its optional provider,
   model, and effort choices exclusively from that projection.
-- The item header now distinguishes automatic/requested routing instead of
-  exposing static Claude-oriented selectors.
-- Ten backend tests, Flutter static analysis, and 25 Flutter tests pass.
+- The item header distinguishes automatic/requested routing, and open items
+  can edit all three routing preferences from a catalog-driven dialog.
+- Provider Auto exposes the deduplicated union across every published target;
+  no first-target or static effort fallback remains.
+- Backend tests, Flutter static analysis, and Flutter tests pass.
 - Live publication was attempted but this checkout has no service-account
   credential; run `devloop targets publish` after configuring
   `DEV_LOOP_SERVICE_ACCOUNT` or `data/service-account.json`.

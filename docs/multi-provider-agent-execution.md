@@ -2,13 +2,17 @@
 
 ## Status
 
-Planning document. The provider-selection and dispatch architecture described
-below is not implemented yet.
+The foreground single-worker pilot is implemented as of 2026-07-14: a
+launchd-triggered deterministic orchestrator uses a local llama.cpp router,
+transactionally claims an item with its run record, and dispatches to Codex
+through a trusted full-access adapter. Claude routing is implemented but its
+catalog target remains disabled and has not been live-tested.
 
-This revision reflects the codebase as of 2026-07-14, including the new
-mechanical run commands in `src/backend/devloop/run.py` and the expanded
-runbook. Those existing pieces should be reused rather than rebuilt inside an
-LLM prompt.
+This is still an end-state design document. Bounded research/handoff bundles,
+artifact reaping, resumable provider sessions, cancellation, leases,
+heartbeats, and parallel dispatch remain future phases. The tracked delivery
+state is in `docs/multi-provider-agent-execution-tasks/README.md`; those
+features must not be inferred from the completed foreground pilot.
 
 ## Terminology
 
@@ -89,35 +93,30 @@ their behavior.
 
 No Firestore migration is required merely to allow omitted values.
 
-### Gaps that matter for the new direction
+### Remaining gaps after the foreground pilot
 
-1. `modelOptions` is a static, Claude-oriented list (`haiku`, `sonnet`,
-   `opus`, `fable`). It cannot represent provider-dependent choices.
-2. The UI always presents model and effort selectors, so they feel like
-   expected inputs even though storage permits `null`.
-3. There is no provider or target field on an action item.
-4. The same item fields would currently have to represent both a user request
-   and an automatic router decision. Those are different facts and should not
-   be conflated.
-5. There is no local target catalog, router contract, dispatch command, or
-   provider adapter boundary.
-6. There is no structured run record tying an item attempt to its resolved
-   provider, model, effort, worker session, worktree, and outcome.
-7. Claims assume one top-level coordinator and are not a transactional lease.
-   That is acceptable for the first single-run implementation but must be
-   revisited before parallel dispatch.
-8. `data/agent-runs.log` is useful operational evidence but is local,
-   line-oriented, and not enough to reconstruct multiple execution attempts.
-9. The backend has no focused automated tests for queue, routing, dispatch, and
-   recovery contracts.
-10. Provider-specific permission files currently enumerate existing backend
-    commands. They will eventually need to allow the single orchestrator entry
-    point without granting arbitrary provider command execution to the router.
+The pilot now has nullable routing preferences, a data-driven frontend catalog,
+a local schema-constrained router, transactional run/claim creation, structured
+run records and routing events, trusted provider adapters, and focused backend
+and frontend contract tests.
+
+The remaining gaps are the later end-state phases:
+
+1. Claims are atomic but are not renewable leases; there are no heartbeats.
+2. Stale work is preserved and surfaced for human review, but provider sessions
+   are not resumed automatically.
+3. Cancellation, bounded retry, and parallel target-concurrency enforcement do
+   not exist yet.
+4. Optional bounded local research and manifest-owned handoff bundles are not
+   implemented.
+5. Provider diagnostic artifacts have no formal retention/reaper policy yet.
+6. Claude is structurally implemented but intentionally disabled and not
+   live-tested; Gemini and a local coding worker remain out of scope.
 
 ## Recommended end state
 
 ```text
-Codex scheduled task (wake-up trigger)
+launchd calendar trigger
                  |
                  v
         deterministic orchestrator
@@ -151,28 +150,13 @@ judgments inside explicit contracts.
 
 ## Scheduler recommendation
 
-Use a **Codex scheduled task** as the initial wake-up mechanism.
+Use the operating system scheduler as the wake-up mechanism. On this machine,
+`launchd` runs the provider-neutral autonomous command at the five configured
+local times. A separate always-on LaunchAgent supervises llama-server.
 
-It remains the best operational starting point because it can run against the
-local project or an isolated worktree, supports custom schedules, and exposes
-runs for review in the desktop app. The scheduled prompt should become very
-small: enter this project, invoke the provider-neutral autonomous-run command,
-and report an infrastructure failure if that command cannot complete.
-
-The scheduled Codex model should not decide which worker handles an item. Its
-role is only to wake the deterministic orchestrator. The local router owns that
-decision.
-
-Once the autonomous command is stable, `launchd`, cron, or another local
-scheduler could trigger the same entry point without changing routing or
-provider adapters. That is a future operational choice, not a prerequisite for
-the Codex scheduled-task pilot.
-
-Relevant Codex documentation:
-
-- [Scheduled tasks](https://developers.openai.com/codex/app/automations)
-- [Non-interactive Codex execution](https://developers.openai.com/codex/noninteractive)
-- [Codex SDK](https://developers.openai.com/codex/sdk)
+Neither Codex nor Claude schedules own orchestration. Codex is invoked only as
+a worker selected by the local router, so provider selection and queue
+lifecycle remain independent of any provider's scheduling product.
 
 ## User overrides: optional constraints, not resolved assignments
 
@@ -860,7 +844,7 @@ the fixture set. Do not train directly on unreviewed outcomes.
   finalization into `run autonomous`.
 - Keep one-item-at-a-time behavior.
 - Make `run end` execute through guaranteed cleanup.
-- Change the Codex scheduled task to invoke only this entry point.
+- Trigger only this entry point from the local `launchd` calendar agent.
 - Review several scheduled runs before expanding permissions or concurrency.
 
 ### Phase 8: Resumption and optional concurrency
@@ -872,8 +856,8 @@ the fixture set. Do not train directly on unreviewed outcomes.
 
 ## File-by-file implementation map
 
-No code changes are part of this document revision. When implementation starts,
-the likely touch points are:
+The pilot uses these touch points; the research/reaping and lease/resume pieces
+remain future additions:
 
 - `src/backend/devloop/run.py` — compose the autonomous run without replacing
   existing queue/stale/end mechanics;
@@ -897,7 +881,7 @@ the likely touch points are:
 
 ## Acceptance criteria
 
-The first router-controlled multi-provider version is ready when:
+The foreground router-controlled pilot is ready when:
 
 - users can create items with provider, model, and effort all omitted;
 - partial user overrides are honored exactly;
@@ -908,39 +892,37 @@ The first router-controlled multi-provider version is ready when:
   user requests;
 - each dispatched run produces one durable, compact routing event in the item
   thread before its worker message;
-- local research is bounded, revision/thread/digest scoped, passed through a
-  trusted per-run manifest rather than shell arguments, and treated as advisory;
-- successful and expired failed research bundles are reaped deterministically
-  without deleting outside the owned data root;
 - fresh items route before claim and are revalidated at dispatch;
-- in-progress items resume their existing assignment instead of being silently
-  rerouted;
-- a fake adapter and at least two real provider adapters pass the same lifecycle
-  contract tests;
+- in-progress items are never silently rerouted and do not block later work;
+- a fake adapter and Codex pass the lifecycle contract, while the disabled
+  Claude adapter passes its mocked structural contract;
 - timeout, authentication, sandbox, rate-limit, and write-back failures leave
   useful recoverable state;
 - one item is finalized before the next is dispatched;
-- scheduled Codex runs invoke the provider-neutral entry point and remain
-  reviewable;
+- scheduled local runs invoke the provider-neutral entry point;
 - credentials are absent from Firestore, attached logs, prompts, and Git;
 - workers never mark an item `closed`.
 
+Research manifests/reaping, automatic resumption, cancellation, leases,
+heartbeats, bounded retries, and parallelism are acceptance criteria for Tasks
+9–10, not for the foreground pilot.
+
 ## Open decisions
 
-1. Which local runtime and model should perform routing?
+1. Which later local coding worker, if any, should be added alongside Codex?
 2. Should a fully specified valid user override bypass local inference, or
    should the router always confirm it?
 3. What normalized effort vocabulary should dev-loop expose?
 4. Should cloud use default to allowed, denied, or repository-specific?
 5. Which repository facts should the crawl cache for routing?
-6. What confidence threshold should force `needs-human-routing`?
+6. Is the current `medium` confidence threshold correct after shadow data?
 7. What deterministic fallback, if any, is acceptable when the router is down?
 8. How long should routing decisions, run records, raw logs, and worktrees be
    retained?
 9. Should the router choose whether a separate reviewer worker is required, or
    should reviewer policy be derived deterministically from effort/risk?
-10. When should the scheduler move from a Codex scheduled task to a plain local
-    service, if ever?
+10. Should launchd failure notifications be mirrored somewhere beyond the
+    frontend health summary and local logs?
 11. Which task classes require a research pass, and what file/time/token budget
     is worthwhile for each?
 12. What retention window balances safe debugging of failed runs with the goal
@@ -948,12 +930,7 @@ The first router-controlled multi-provider version is ready when:
 
 ## First implementation decision
 
-Start by making the current model and effort controls visibly optional and by
-defining the target catalog and run-assignment schema. Then build the dispatcher
-against a fake adapter before connecting any LLM.
-
-Run the local router in shadow mode before giving it dispatch authority. Keep
-the Codex scheduled task as the wake-up mechanism, but reduce its responsibility
-to invoking the deterministic autonomous-run entry point. This preserves the
-reviewable scheduled workflow while making the actual provider/model/effort
-decision local, bounded, and replaceable.
+The implemented pilot makes provider/model/effort optional, validates a local
+catalog, routes with Gemma through llama.cpp, dispatches Codex with full access
+inside a trusted adapter, and uses launchd for both router supervision and
+calendar orchestration. Claude remains data-disabled until explicitly enabled.

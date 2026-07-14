@@ -20,12 +20,16 @@ Status: completed
 
 - Added `run autonomous`, composing existing run start/next/end mechanics with
   local routing and trusted adapter dispatch.
-- Added an advisory single-instance lock and explicit stale-item stop rather
-  than silently rerouting an in-progress item.
+- Added an advisory single-instance lock. Stale in-progress work is inspected,
+  preserved, surfaced for review, and moved to `needs-review` so later open
+  work is not permanently blocked; it is never silently rerouted.
 - Added separate llama-server supervision and calendar orchestrator
   LaunchAgents for the five configured local times.
-- Thirty backend tests pass, including idle, failure-finally, dispatch, and
-  overlapping-run behavior.
+- Run-end logging now occurs even when bootstrap fails. Completion publishes
+  safe router/provider health and outcome state for the frontend.
+- Backend tests cover idle, bootstrap failure, failure-finally, stale queue
+  continuation, dispatch, and overlapping-run behavior.
 - Both plist files pass `plutil -lint`.
-- LaunchAgents remain unloaded until the manual port-8080 server is stopped and
-  a Firebase service-account credential is configured.
+- The llama-server LaunchAgent is loaded, healthy, and proven to restart after
+  termination. The orchestrator LaunchAgent still requires a Firebase
+  service-account credential before it can be safely loaded.
