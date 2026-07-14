@@ -242,7 +242,7 @@ class BoardService {
   /// `-1` correction is needed before inserting).
   ///
   /// [displayed] is the list exactly as shown to the user *for the scope
-  /// being reordered* (the flat list view, or a single kanban column) —
+  /// being reordered* (the flat list view, a kanban column, or a project) —
   /// already sorted by [effectiveOrder] — so [oldIndex]/[newIndex] line up
   /// with Flutter's reporting. [allItems] is every active (non-archived)
   /// item on the whole board, across every status, also sorted by

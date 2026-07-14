@@ -24,27 +24,17 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: StreamBuilder<ScheduleInfo>(
           stream: board.schedule(),
-          builder: (context, snapshot) => BrandTitle(
-            scheduleTimes: snapshot.data?.times ?? const [],
-          ),
+          builder: (context, snapshot) =>
+              BrandTitle(scheduleTimes: snapshot.data?.times ?? const []),
         ),
         actions: [
-          IconButton(
-            tooltip: app.showArchived
-                ? 'Back to active board'
-                : 'View archived items',
-            icon: Icon(app.showArchived
-                ? Icons.unarchive_outlined
-                : Icons.archive_outlined),
-            onPressed: app.toggleShowArchived,
-          ),
           const ThemeToggleButton(),
           IconButton(
             tooltip: 'Profile',
             icon: const Icon(Icons.person_outline),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ProfileScreen()),
-            ),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const ProfileScreen())),
           ),
           const SizedBox(width: 8),
         ],
@@ -77,7 +67,7 @@ class HomeScreen extends StatelessWidget {
           // this. See BoardService.reorderItem.
           final allActive = [
             for (final i in snap.data!)
-              if (!i.archived) i
+              if (!i.archived) i,
           ]..sort((a, b) => effectiveOrder(a).compareTo(effectiveOrder(b)));
           return Column(
             children: [
@@ -104,28 +94,33 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
               Expanded(
-                child: app.boardView == BoardView.list
-                    ? _ListView(
-                        items: items,
-                        showArchived: app.showArchived,
-                        onRefresh: board.refresh,
-                        onReorder: (i, j) => board.reorderItem(
-                          items,
-                          i,
-                          j,
-                          allItems: allActive,
-                        ),
-                      )
-                    : _KanbanView(
-                        items: items,
-                        onRefresh: board.refresh,
-                        onReorder: (column, i, j) => board.reorderItem(
-                          column,
-                          i,
-                          j,
-                          allItems: allActive,
-                        ),
-                      ),
+                child: switch (app.boardView) {
+                  BoardView.list => _ListView(
+                    items: items,
+                    showArchived: app.showArchived,
+                    onRefresh: board.refresh,
+                    onReorder: (i, j) =>
+                        board.reorderItem(items, i, j, allItems: allActive),
+                  ),
+                  BoardView.kanban => _KanbanView(
+                    items: items,
+                    statuses: [
+                      for (final status in itemStatuses)
+                        if (app.statusFilter.contains(status)) status,
+                    ],
+                    reorderEnabled: !app.showArchived,
+                    onRefresh: board.refresh,
+                    onReorder: (column, i, j) =>
+                        board.reorderItem(column, i, j, allItems: allActive),
+                  ),
+                  BoardView.projects => _ProjectView(
+                    items: items,
+                    reorderEnabled: !app.showArchived,
+                    onRefresh: board.refresh,
+                    onReorder: (project, i, j) =>
+                        board.reorderItem(project, i, j, allItems: allActive),
+                  ),
+                },
               ),
             ],
           );
@@ -139,7 +134,7 @@ class HomeScreen extends StatelessWidget {
       // Archiving is orthogonal to status: hide archived items from the default
       // board, and in the archived view show only archived ones.
       if (!matchesArchivedView(i, showArchived: app.showArchived)) return false;
-      if (app.statusFilter.isNotEmpty && !app.statusFilter.contains(i.status)) {
+      if (!matchesStatusFilter(i, app.statusFilter)) {
         return false;
       }
       if (app.repoFilter != null && i.repoId != app.repoFilter) return false;
@@ -187,11 +182,15 @@ Future<void> _archiveClosed(BuildContext context, BoardService board) async {
   if (confirmed != true) return;
   try {
     final n = await board.archiveClosed();
-    messenger.showSnackBar(SnackBar(
-      content: Text(n == 0
-          ? 'No closed items to archive'
-          : 'Archived $n closed item${n == 1 ? '' : 's'}'),
-    ));
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          n == 0
+              ? 'No closed items to archive'
+              : 'Archived $n closed item${n == 1 ? '' : 's'}',
+        ),
+      ),
+    );
   } catch (e) {
     messenger.showSnackBar(SnackBar(content: Text('Failed to archive: $e')));
   }
@@ -240,8 +239,10 @@ class _BoardControlsState extends State<_BoardControls> {
               padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
               child: Row(
                 children: [
-                  Text('Filter by status',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    'Filter by status',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ],
               ),
             ),
@@ -261,13 +262,77 @@ class _BoardControlsState extends State<_BoardControls> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: AppTheme.statusColor(
-                              status, Theme.of(context).colorScheme),
+                            status,
+                            Theme.of(context).colorScheme,
+                          ),
                         ),
                       ),
                       title: Text(status),
                     ),
+                  const Divider(height: 1),
+                  CheckboxListTile(
+                    value: app.statusFilter.length == itemStatuses.length,
+                    onChanged: (selected) =>
+                        app.setAllStatusesSelected(selected ?? false),
+                    controlAffinity: ListTileControlAffinity.trailing,
+                    secondary: const Icon(Icons.select_all),
+                    title: const Text('All statuses'),
+                  ),
                 ],
               ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openArchiveSheet(BoardService board) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Row(
+                children: [
+                  Text(
+                    'Archive',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: Icon(
+                app.showArchived
+                    ? Icons.view_list_outlined
+                    : Icons.inventory_2_outlined,
+              ),
+              title: Text(
+                app.showArchived ? 'Show active board' : 'Show archived items',
+              ),
+              subtitle: Text(
+                app.showArchived
+                    ? 'Return to items currently in the workflow'
+                    : 'Browse items that have been archived',
+              ),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                app.toggleShowArchived();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.archive_outlined),
+              title: const Text('Archive all closed items'),
+              subtitle: const Text('Move every closed item out of the board'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _archiveClosed(context, board);
+              },
             ),
             const SizedBox(height: 8),
           ],
@@ -279,13 +344,14 @@ class _BoardControlsState extends State<_BoardControls> {
   @override
   Widget build(BuildContext context) {
     final board = context.read<BoardService>();
-    final activeFilterCount = app.statusFilter.length;
+    final selectedStatusCount = app.statusFilter.length;
+    final statusFilterIsActive = selectedStatusCount != itemStatuses.length;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
       child: Column(
         children: [
           // A single compact row of icon controls — search toggle, status
-          // filter, board-view toggle, and (when relevant) archive-closed
+          // filter, archive actions, and a right-aligned board-view toggle
           // — so everything fits on a narrow phone width without the
           // horizontal-scroll overflow the old chip row had.
           Row(
@@ -296,8 +362,8 @@ class _BoardControlsState extends State<_BoardControls> {
                 onPressed: _toggleSearch,
               ),
               Badge(
-                label: Text('$activeFilterCount'),
-                isLabelVisible: activeFilterCount > 0,
+                label: Text('$selectedStatusCount'),
+                isLabelVisible: statusFilterIsActive,
                 child: IconButton(
                   tooltip: 'Filter by status',
                   icon: const Icon(Icons.filter_list),
@@ -305,23 +371,28 @@ class _BoardControlsState extends State<_BoardControls> {
                 ),
               ),
               IconButton(
-                tooltip: app.boardView == BoardView.list
-                    ? 'Switch to kanban view'
-                    : 'Switch to list view',
+                tooltip: 'Archive options',
                 icon: Icon(
-                  app.boardView == BoardView.list
-                      ? Icons.view_kanban_outlined
-                      : Icons.view_agenda_outlined,
+                  app.showArchived
+                      ? Icons.inventory_2
+                      : Icons.inventory_2_outlined,
                 ),
-                onPressed: app.cycleBoardView,
+                onPressed: () => _openArchiveSheet(board),
               ),
               const Spacer(),
-              if (!app.showArchived)
-                IconButton(
-                  tooltip: 'Archive closed',
-                  icon: const Icon(Icons.archive_outlined),
-                  onPressed: () => _archiveClosed(context, board),
-                ),
+              IconButton(
+                tooltip: switch (app.boardView) {
+                  BoardView.list => 'Switch to kanban view',
+                  BoardView.kanban => 'Switch to project view',
+                  BoardView.projects => 'Switch to list view',
+                },
+                icon: Icon(switch (app.boardView) {
+                  BoardView.list => Icons.view_kanban_outlined,
+                  BoardView.kanban => Icons.folder_copy_outlined,
+                  BoardView.projects => Icons.view_agenda_outlined,
+                }),
+                onPressed: app.cycleBoardView,
+              ),
             ],
           ),
           AnimatedCrossFade(
@@ -382,11 +453,15 @@ class _ListView extends StatelessWidget {
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: [
                   ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
                     child: Center(
-                      child: Text(showArchived
-                          ? 'No archived items'
-                          : 'No action items — add one with the + button'),
+                      child: Text(
+                        showArchived
+                            ? 'No archived items'
+                            : 'No action items — add one with the + button',
+                      ),
                     ),
                   ),
                 ],
@@ -396,29 +471,29 @@ class _ListView extends StatelessWidget {
           // governs the active board (and, in turn, agent pickup order), so
           // reordering is disabled here.
           : showArchived
-              ? ListView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.only(top: 4, bottom: 24),
-                  itemCount: items.length,
-                  itemBuilder: (context, i) => ItemCard(
-                    item: items[i],
-                    onTap: () => openItem(context, items[i].id),
-                  ),
-                )
-              : ReorderableListView.builder(
-                  buildDefaultDragHandles: false,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.only(top: 4, bottom: 24),
-                  itemCount: items.length,
-                  onReorderItem: onReorder,
-                  proxyDecorator: dragProxyDecorator,
-                  itemBuilder: (context, i) => ItemCard(
-                    key: ValueKey(items[i].id),
-                    item: items[i],
-                    onTap: () => openItem(context, items[i].id),
-                    dragHandle: DragHandle(index: i),
-                  ),
-                ),
+          ? ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(top: 4, bottom: 24),
+              itemCount: items.length,
+              itemBuilder: (context, i) => ItemCard(
+                item: items[i],
+                onTap: () => openItem(context, items[i].id),
+              ),
+            )
+          : ReorderableListView.builder(
+              buildDefaultDragHandles: false,
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(top: 4, bottom: 24),
+              itemCount: items.length,
+              onReorderItem: onReorder,
+              proxyDecorator: dragProxyDecorator,
+              itemBuilder: (context, i) => ItemCard(
+                key: ValueKey(items[i].id),
+                item: items[i],
+                onTap: () => openItem(context, items[i].id),
+                dragHandle: DragHandle(index: i),
+              ),
+            ),
     );
   }
 }
@@ -426,17 +501,21 @@ class _ListView extends StatelessWidget {
 class _KanbanView extends StatelessWidget {
   const _KanbanView({
     required this.items,
+    required this.statuses,
+    required this.reorderEnabled,
     required this.onRefresh,
     required this.onReorder,
   });
 
   final List<ActionItem> items;
+  final List<String> statuses;
+  final bool reorderEnabled;
   final Future<void> Function() onRefresh;
   // Manual order applies within each status column too — dragging a card up
   // or down a column reorders it only among that column's items, so a card
   // never has to be dragged across a full board to reach the right spot.
   final void Function(List<ActionItem> column, int oldIndex, int newIndex)
-      onReorder;
+  onReorder;
 
   @override
   Widget build(BuildContext context) {
@@ -448,7 +527,7 @@ class _KanbanView extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
       children: [
-        for (final status in itemStatuses)
+        for (final status in statuses)
           Container(
             width: width,
             margin: const EdgeInsets.only(right: 8),
@@ -456,8 +535,10 @@ class _KanbanView extends StatelessWidget {
               color: scheme.surface.withValues(alpha: 0.35),
               borderRadius: BorderRadius.circular(AppTheme.radius),
               border: Border.all(
-                color: AppTheme.statusColor(status, scheme)
-                    .withValues(alpha: 0.25),
+                color: AppTheme.statusColor(
+                  status,
+                  scheme,
+                ).withValues(alpha: 0.25),
               ),
             ),
             child: Column(
@@ -486,24 +567,38 @@ class _KanbanView extends StatelessWidget {
                   // even for short/empty columns.
                   child: RefreshIndicator(
                     onRefresh: onRefresh,
-                    child: Builder(builder: (context) {
-                      final column =
-                          items.where((i) => i.status == status).toList();
-                      return ReorderableListView.builder(
-                        buildDefaultDragHandles: false,
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.only(bottom: 8),
-                        itemCount: column.length,
-                        onReorderItem: (i, j) => onReorder(column, i, j),
-                        proxyDecorator: dragProxyDecorator,
-                        itemBuilder: (context, i) => ItemCard(
-                          key: ValueKey(column[i].id),
-                          item: column[i],
-                          onTap: () => openItem(context, column[i].id),
-                          dragHandle: DragHandle(index: i),
-                        ),
-                      );
-                    }),
+                    child: Builder(
+                      builder: (context) {
+                        final column = items
+                            .where((i) => i.status == status)
+                            .toList();
+                        if (!reorderEnabled) {
+                          return ListView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.only(bottom: 8),
+                            itemCount: column.length,
+                            itemBuilder: (context, i) => ItemCard(
+                              item: column[i],
+                              onTap: () => openItem(context, column[i].id),
+                            ),
+                          );
+                        }
+                        return ReorderableListView.builder(
+                          buildDefaultDragHandles: false,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.only(bottom: 8),
+                          itemCount: column.length,
+                          onReorderItem: (i, j) => onReorder(column, i, j),
+                          proxyDecorator: dragProxyDecorator,
+                          itemBuilder: (context, i) => ItemCard(
+                            key: ValueKey(column[i].id),
+                            item: column[i],
+                            onTap: () => openItem(context, column[i].id),
+                            dragHandle: DragHandle(index: i),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
               ],
@@ -514,10 +609,130 @@ class _KanbanView extends StatelessWidget {
   }
 }
 
+/// A project-first board: each repository gets a horizontally scrollable
+/// column, with the same manual ordering semantics as the status columns.
+/// This makes it easy to scan one codebase's full workflow without losing the
+/// status context carried by each card's status chip.
+class _ProjectView extends StatelessWidget {
+  const _ProjectView({
+    required this.items,
+    required this.reorderEnabled,
+    required this.onRefresh,
+    required this.onReorder,
+  });
+
+  final List<ActionItem> items;
+  final bool reorderEnabled;
+  final Future<void> Function() onRefresh;
+  final void Function(List<ActionItem> project, int oldIndex, int newIndex)
+  onReorder;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final width = (MediaQuery.of(context).size.width - 24).clamp(260.0, 360.0);
+    final projectIds = <String>[];
+    for (final item in items) {
+      if (!projectIds.contains(item.repoId)) projectIds.add(item.repoId);
+    }
+
+    return ListView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
+      children: [
+        for (final projectId in projectIds)
+          Builder(
+            builder: (context) {
+              final project = items
+                  .where((item) => item.repoId == projectId)
+                  .toList();
+              return Container(
+                width: width,
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: scheme.surface.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(AppTheme.radius),
+                  border: Border.all(
+                    color: scheme.primary.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.folder_outlined,
+                            size: 18,
+                            color: scheme.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              repoShortName(projectId),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '${project.length}',
+                            style: TextStyle(
+                              color: scheme.onSurface.withValues(alpha: 0.5),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: onRefresh,
+                        child: reorderEnabled
+                            ? ReorderableListView.builder(
+                                buildDefaultDragHandles: false,
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.only(bottom: 8),
+                                itemCount: project.length,
+                                onReorderItem: (i, j) =>
+                                    onReorder(project, i, j),
+                                proxyDecorator: dragProxyDecorator,
+                                itemBuilder: (context, i) => ItemCard(
+                                  key: ValueKey(project[i].id),
+                                  item: project[i],
+                                  onTap: () => openItem(context, project[i].id),
+                                  dragHandle: DragHandle(index: i),
+                                ),
+                              )
+                            : ListView.builder(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.only(bottom: 8),
+                                itemCount: project.length,
+                                itemBuilder: (context, i) => ItemCard(
+                                  item: project[i],
+                                  onTap: () => openItem(context, project[i].id),
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
+}
+
 void openItem(BuildContext context, String itemId) {
-  Navigator.of(context).push(
-    MaterialPageRoute(builder: (_) => ItemScreen(itemId: itemId)),
-  );
+  Navigator.of(
+    context,
+  ).push(MaterialPageRoute(builder: (_) => ItemScreen(itemId: itemId)));
 }
 
 /// Grab handle for manual reordering: a small grip glyph that only the
@@ -553,7 +768,11 @@ class DragHandle extends StatelessWidget {
 /// list with a cyan glow and a slight tilt, echoing the board's sci-fi
 /// accent color so a drag in progress reads as unmistakably different from
 /// a static card.
-Widget dragProxyDecorator(Widget child, int index, Animation<double> animation) {
+Widget dragProxyDecorator(
+  Widget child,
+  int index,
+  Animation<double> animation,
+) {
   return AnimatedBuilder(
     animation: animation,
     builder: (context, _) {

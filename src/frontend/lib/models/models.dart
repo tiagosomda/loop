@@ -70,6 +70,13 @@ class ActionItem {
 bool matchesArchivedView(ActionItem item, {required bool showArchived}) =>
     item.archived == showArchived;
 
+/// Whether [item] is included by a literal set of selected statuses.
+///
+/// In particular, an empty selection matches nothing; callers represent the
+/// unfiltered/show-all state by selecting every value in [itemStatuses].
+bool matchesStatusFilter(ActionItem item, Set<String> selectedStatuses) =>
+    selectedStatuses.contains(item.status);
+
 /// The manual board position to sort by: the explicit `order` field once an
 /// item has been dragged (or created after this feature shipped), falling
 /// back to creation time for older items that predate manual ordering so
@@ -94,18 +101,18 @@ class Attachment {
   bool get isImage => contentType.startsWith('image/');
 
   factory Attachment.fromMap(Map<String, dynamic> m) => Attachment(
-        name: m['name'] ?? 'file',
-        storagePath: m['storagePath'] ?? '',
-        contentType: m['contentType'] ?? 'application/octet-stream',
-        size: (m['size'] ?? 0) as int,
-      );
+    name: m['name'] ?? 'file',
+    storagePath: m['storagePath'] ?? '',
+    contentType: m['contentType'] ?? 'application/octet-stream',
+    size: (m['size'] ?? 0) as int,
+  );
 
   Map<String, dynamic> toMap() => {
-        'name': name,
-        'storagePath': storagePath,
-        'contentType': contentType,
-        'size': size,
-      };
+    'name': name,
+    'storagePath': storagePath,
+    'contentType': contentType,
+    'size': size,
+  };
 }
 
 class ThreadMessage {
@@ -182,8 +189,8 @@ class ScheduleInfo {
   ScheduleInfo({required this.times, this.lastRunAt, this.updatedAt});
 
   factory ScheduleInfo.fromMap(Map<String, dynamic>? d) => ScheduleInfo(
-        times: [for (final t in (d?['times'] as List? ?? [])) t.toString()],
-        lastRunAt: _ts(d?['lastRunAt']),
-        updatedAt: _ts(d?['updatedAt']),
-      );
+    times: [for (final t in (d?['times'] as List? ?? [])) t.toString()],
+    lastRunAt: _ts(d?['lastRunAt']),
+    updatedAt: _ts(d?['updatedAt']),
+  );
 }

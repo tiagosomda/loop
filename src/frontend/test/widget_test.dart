@@ -18,71 +18,80 @@ void main() {
     // actually pulls down on a card. If this regresses, RefreshIndicator's
     // onRefresh is not firing for the reorderable list.
     testWidgets(
-        'RefreshIndicator.onRefresh fires when pulling a ReorderableListView '
-        'with custom drag handles', (tester) async {
-      var refreshCount = 0;
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: RefreshIndicator(
-            onRefresh: () async => refreshCount++,
-            child: ReorderableListView.builder(
-              buildDefaultDragHandles: false,
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.only(top: 4, bottom: 24),
-              itemCount: 5,
-              onReorderItem: (a, b) {},
-              itemBuilder: (context, i) => Card(
-                key: ValueKey(i),
-                child: InkWell(
-                  onTap: () {},
-                  child: ListTile(
-                    title: Text('item $i'),
-                    trailing: ReorderableDragStartListener(
-                      index: i,
-                      child: const Icon(Icons.drag_indicator),
+      'RefreshIndicator.onRefresh fires when pulling a ReorderableListView '
+      'with custom drag handles',
+      (tester) async {
+        var refreshCount = 0;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: RefreshIndicator(
+                onRefresh: () async => refreshCount++,
+                child: ReorderableListView.builder(
+                  buildDefaultDragHandles: false,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(top: 4, bottom: 24),
+                  itemCount: 5,
+                  onReorderItem: (a, b) {},
+                  itemBuilder: (context, i) => Card(
+                    key: ValueKey(i),
+                    child: InkWell(
+                      onTap: () {},
+                      child: ListTile(
+                        title: Text('item $i'),
+                        trailing: ReorderableDragStartListener(
+                          index: i,
+                          child: const Icon(Icons.drag_indicator),
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
-      ));
+        );
 
-      // Pull down from within the first card's body (not its drag handle) —
-      // the gesture a user performs to trigger pull-to-refresh.
-      await tester.fling(find.text('item 0'), const Offset(0, 300), 1000);
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 1));
-      await tester.pumpAndSettle();
+        // Pull down from within the first card's body (not its drag handle) —
+        // the gesture a user performs to trigger pull-to-refresh.
+        await tester.fling(find.text('item 0'), const Offset(0, 300), 1000);
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pumpAndSettle();
 
-      expect(refreshCount, 1);
-    });
+        expect(refreshCount, 1);
+      },
+    );
 
     // Regression test for the fix: BoardService.isRefreshing drives a
     // top-of-board progress bar directly, so the user gets a guaranteed,
     // unambiguous confirmation even if a refresh round-trip resolves too
     // quickly for RefreshIndicator's own animation to register, or if the
     // pull gesture itself was never recognized as an overscroll.
-    testWidgets('explicit refreshing indicator toggles with isRefreshing',
-        (tester) async {
+    testWidgets('explicit refreshing indicator toggles with isRefreshing', (
+      tester,
+    ) async {
       final refreshing = ValueNotifier<bool>(false);
       addTearDown(refreshing.dispose);
 
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: ValueListenableBuilder<bool>(
-            valueListenable: refreshing,
-            builder: (context, value, _) => AnimatedSwitcher(
-              duration: const Duration(milliseconds: 150),
-              child: value
-                  ? const LinearProgressIndicator(
-                      key: ValueKey('refreshing'), minHeight: 2)
-                  : const SizedBox(height: 2, key: ValueKey('idle')),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ValueListenableBuilder<bool>(
+              valueListenable: refreshing,
+              builder: (context, value, _) => AnimatedSwitcher(
+                duration: const Duration(milliseconds: 150),
+                child: value
+                    ? const LinearProgressIndicator(
+                        key: ValueKey('refreshing'),
+                        minHeight: 2,
+                      )
+                    : const SizedBox(height: 2, key: ValueKey('idle')),
+              ),
             ),
           ),
         ),
-      ));
+      );
 
       expect(find.byType(LinearProgressIndicator), findsNothing);
 
@@ -107,14 +116,39 @@ void main() {
     ]);
   });
 
+  group('literal status filtering', () {
+    final item = ActionItem(id: 'x', title: 't', repoId: 'r', status: 'open');
+
+    test('an empty selection matches nothing', () {
+      expect(matchesStatusFilter(item, <String>{}), isFalse);
+    });
+
+    test('the all-selected default includes every status', () {
+      for (final status in itemStatuses) {
+        final statusItem = ActionItem(
+          id: status,
+          title: status,
+          repoId: 'r',
+          status: status,
+        );
+        expect(matchesStatusFilter(statusItem, itemStatuses.toSet()), isTrue);
+      }
+    });
+
+    test('a partial selection only includes selected statuses', () {
+      expect(matchesStatusFilter(item, {'open', 'closed'}), isTrue);
+      expect(matchesStatusFilter(item, {'closed'}), isFalse);
+    });
+  });
+
   group('archived view filtering', () {
     ActionItem item({required bool archived}) => ActionItem(
-          id: 'x',
-          title: 't',
-          repoId: 'r',
-          status: 'completed',
-          archived: archived,
-        );
+      id: 'x',
+      title: 't',
+      repoId: 'r',
+      status: 'completed',
+      archived: archived,
+    );
 
     test('default view shows only non-archived items', () {
       expect(
@@ -186,36 +220,44 @@ void main() {
       );
       expect(result.length, 3);
       for (final v in result) {
-        expect(v > 50, isTrue, reason: '$v must be strictly above the lower neighbor');
-        expect(v < 500, isTrue, reason: '$v must be strictly below the upper neighbor');
+        expect(
+          v > 50,
+          isTrue,
+          reason: '$v must be strictly above the lower neighbor',
+        );
+        expect(
+          v < 500,
+          isTrue,
+          reason: '$v must be strictly below the upper neighbor',
+        );
       }
       // Order is preserved and none of the other board's values are reused.
       expect(result[0] < result[1] && result[1] < result[2], isTrue);
       expect(result.toSet().intersection({50, 500}), isEmpty);
     });
 
-    test('never resets to small absolute indices that collide with untouched items', () {
-      // The original bug: renumbering reset a column to (i+1)*1000, which
-      // is exactly the value another untouched item might already hold
-      // (e.g. a fresh board's second-ever item). Assert the new values
-      // don't coincide with an unrelated item sitting at 1000, 2000, 3000.
-      final result = renumberedOrders(
-        scopeOrders: [1500, 1500.2, 1500.4],
-        otherOrders: [1000, 2000, 3000],
-      );
-      expect(result.any((v) => v == 1000 || v == 2000 || v == 3000), isFalse);
-      // 1000 < scope < 2000 in this scenario, so the fix should bound the
-      // renumber to that gap rather than spilling past 3000 or below 1000.
-      for (final v in result) {
-        expect(v > 1000 && v < 2000, isTrue);
-      }
-    });
+    test(
+      'never resets to small absolute indices that collide with untouched items',
+      () {
+        // The original bug: renumbering reset a column to (i+1)*1000, which
+        // is exactly the value another untouched item might already hold
+        // (e.g. a fresh board's second-ever item). Assert the new values
+        // don't coincide with an unrelated item sitting at 1000, 2000, 3000.
+        final result = renumberedOrders(
+          scopeOrders: [1500, 1500.2, 1500.4],
+          otherOrders: [1000, 2000, 3000],
+        );
+        expect(result.any((v) => v == 1000 || v == 2000 || v == 3000), isFalse);
+        // 1000 < scope < 2000 in this scenario, so the fix should bound the
+        // renumber to that gap rather than spilling past 3000 or below 1000.
+        for (final v in result) {
+          expect(v > 1000 && v < 2000, isTrue);
+        }
+      },
+    );
 
     test('extends past the board edge when there is no bounding neighbor', () {
-      final result = renumberedOrders(
-        scopeOrders: [10, 20],
-        otherOrders: [],
-      );
+      final result = renumberedOrders(scopeOrders: [10, 20], otherOrders: []);
       expect(result.length, 2);
       expect(result[0] < result[1], isTrue);
     });
@@ -251,20 +293,25 @@ void main() {
     // Regression test for the "logged out login issue" polish request: the
     // signed-out screen's big logo should spin slowly on its own, and a tap
     // should layer a noticeably faster burst on top of that idle rotation.
-    testWidgets('tapping spins the logo faster than its idle rate',
-        (tester) async {
-      await tester.pumpWidget(const MaterialApp(
-        home: Scaffold(
-          body: Center(child: SpinningDevLoopLogo(tappable: true)),
+    testWidgets('tapping spins the logo faster than its idle rate', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Center(child: SpinningDevLoopLogo(tappable: true)),
+          ),
         ),
-      ));
+      );
       await tester.pump();
 
       double angleOf() {
-        final transform = tester.widget<Transform>(find.descendant(
-          of: find.byType(SpinningDevLoopLogo),
-          matching: find.byType(Transform),
-        ));
+        final transform = tester.widget<Transform>(
+          find.descendant(
+            of: find.byType(SpinningDevLoopLogo),
+            matching: find.byType(Transform),
+          ),
+        );
         final m = transform.transform.storage;
         return math.atan2(m[1], m[0]);
       }

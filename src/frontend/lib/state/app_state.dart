@@ -5,9 +5,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../firebase_options.dart';
 import '../models/models.dart';
 
-enum BoardView { list, kanban }
+enum BoardView { list, kanban, projects }
 
 const _statusFilterPrefsKey = 'statusFilter';
+const _statusFilterVersionPrefsKey = 'statusFilterVersion';
+const _statusFilterVersion = 2;
 
 class AppState extends ChangeNotifier {
   AppState() {
@@ -25,7 +27,10 @@ class AppState extends ChangeNotifier {
 
   // board filters
   String search = '';
-  final Set<String> statusFilter = {};
+  // Selected statuses are represented literally: all selected means show all,
+  // while an empty set means show no items. Seed the first launch with every
+  // status so the default board remains the complete board.
+  final Set<String> statusFilter = itemStatuses.toSet();
   String? repoFilter;
   // When true the board shows only archived items; otherwise archived items
   // are hidden from the default view.
@@ -74,10 +79,19 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getStringList(_statusFilterPrefsKey);
     if (saved == null) return;
+    final version = prefs.getInt(_statusFilterVersionPrefsKey);
     statusFilter
       ..clear()
-      ..addAll(saved.where(itemStatuses.contains));
+      // Before literal empty-filter semantics, an empty saved set still meant
+      // "show all." Migrate that one legacy value without preventing users
+      // from saving an intentionally empty selection from now on.
+      ..addAll(
+        version == _statusFilterVersion || saved.isNotEmpty
+            ? saved.where(itemStatuses.contains)
+            : itemStatuses,
+      );
     notifyListeners();
+    await prefs.setInt(_statusFilterVersionPrefsKey, _statusFilterVersion);
   }
 
   void toggleStatusFilter(String status) {
@@ -85,9 +99,21 @@ class AppState extends ChangeNotifier {
         ? statusFilter.remove(status)
         : statusFilter.add(status);
     notifyListeners();
-    SharedPreferences.getInstance().then(
-      (prefs) => prefs.setStringList(_statusFilterPrefsKey, statusFilter.toList()),
-    );
+    _saveStatusFilter();
+  }
+
+  void setAllStatusesSelected(bool selected) {
+    statusFilter
+      ..clear()
+      ..addAll(selected ? itemStatuses : const <String>[]);
+    notifyListeners();
+    _saveStatusFilter();
+  }
+
+  Future<void> _saveStatusFilter() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_statusFilterPrefsKey, statusFilter.toList());
+    await prefs.setInt(_statusFilterVersionPrefsKey, _statusFilterVersion);
   }
 
   void toggleShowArchived() {
