@@ -30,11 +30,6 @@ class HomeScreen extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            tooltip: 'New action item',
-            icon: const Icon(Icons.add),
-            onPressed: () => openNewItemScreen(context),
-          ),
-          IconButton(
             tooltip: app.showArchived
                 ? 'Back to active board'
                 : 'View archived items',
@@ -43,28 +38,6 @@ class HomeScreen extends StatelessWidget {
                 : Icons.archive_outlined),
             onPressed: app.toggleShowArchived,
           ),
-          if (!app.showArchived)
-            PopupMenuButton<String>(
-              tooltip: 'Board actions',
-              icon: const Icon(Icons.more_vert),
-              onSelected: (v) {
-                if (v == 'archive-completed') {
-                  _archiveCompleted(context, board);
-                }
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem(
-                  value: 'archive-completed',
-                  child: Row(
-                    children: [
-                      Icon(Icons.archive_outlined, size: 18),
-                      SizedBox(width: 10),
-                      Text('Archive completed'),
-                    ],
-                  ),
-                ),
-              ],
-            ),
           const ThemeToggleButton(),
           IconButton(
             tooltip: 'Profile',
@@ -76,6 +49,17 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(width: 8),
         ],
       ),
+      // Always-visible affordance for creating a new item. Hidden while
+      // viewing the archive, which has no "new item" concept — matches the
+      // list's own "No archived items" empty state, which offers no add
+      // prompt either.
+      floatingActionButton: app.showArchived
+          ? null
+          : FloatingActionButton(
+              tooltip: 'New action item',
+              onPressed: () => openNewItemScreen(context),
+              child: const Icon(Icons.add),
+            ),
       body: StreamBuilder<List<ActionItem>>(
         stream: board.items(),
         builder: (context, snap) {
@@ -150,42 +134,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _archiveCompleted(
-      BuildContext context, BoardService board) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Archive completed items'),
-        content: const Text(
-          'Archive every item currently marked completed? They stay searchable '
-          'in the archived view and can be restored anytime.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Archive'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    try {
-      final n = await board.archiveCompleted();
-      messenger.showSnackBar(SnackBar(
-        content: Text(n == 0
-            ? 'No completed items to archive'
-            : 'Archived $n completed item${n == 1 ? '' : 's'}'),
-      ));
-    } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Failed to archive: $e')));
-    }
-  }
-
   List<ActionItem> _filtered(List<ActionItem> items, AppState app) {
     var result = items.where((i) {
       // Archiving is orthogonal to status: hide archived items from the default
@@ -211,31 +159,151 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-class _BoardControls extends StatelessWidget {
+/// Shows a confirmation dialog, then archives every currently-completed
+/// item. Lives at top level (not on [HomeScreen]) so both the screen and
+/// [_BoardControls] can trigger it.
+Future<void> _archiveCompleted(BuildContext context, BoardService board) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Archive completed items'),
+      content: const Text(
+        'Archive every item currently marked completed? They stay searchable '
+        'in the archived view and can be restored anytime.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Archive'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) return;
+  try {
+    final n = await board.archiveCompleted();
+    messenger.showSnackBar(SnackBar(
+      content: Text(n == 0
+          ? 'No completed items to archive'
+          : 'Archived $n completed item${n == 1 ? '' : 's'}'),
+    ));
+  } catch (e) {
+    messenger.showSnackBar(SnackBar(content: Text('Failed to archive: $e')));
+  }
+}
+
+class _BoardControls extends StatefulWidget {
   const _BoardControls({required this.app});
 
   final AppState app;
 
   @override
+  State<_BoardControls> createState() => _BoardControlsState();
+}
+
+class _BoardControlsState extends State<_BoardControls> {
+  final _searchController = TextEditingController();
+  bool _searchVisible = false;
+
+  AppState get app => widget.app;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _toggleSearch() {
+    setState(() => _searchVisible = !_searchVisible);
+    if (!_searchVisible) {
+      // Closing the search bar also clears whatever was typed — otherwise a
+      // stale, invisible filter would keep hiding items with no way to tell
+      // why the board looks empty.
+      _searchController.clear();
+      app.setSearch('');
+    }
+  }
+
+  void _openStatusFilterSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Row(
+                children: [
+                  Text('Filter by status',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+            ListenableBuilder(
+              listenable: app,
+              builder: (context, _) => Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final status in itemStatuses)
+                    CheckboxListTile(
+                      value: app.statusFilter.contains(status),
+                      onChanged: (_) => app.toggleStatusFilter(status),
+                      controlAffinity: ListTileControlAffinity.trailing,
+                      secondary: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppTheme.statusColor(
+                              status, Theme.of(context).colorScheme),
+                        ),
+                      ),
+                      title: Text(status),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final board = context.read<BoardService>();
+    final activeFilterCount = app.statusFilter.length;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
       child: Column(
         children: [
+          // A single compact row of icon controls — search toggle, status
+          // filter, board-view toggle, and (when relevant) archive-completed
+          // — so everything fits on a narrow phone width without the
+          // horizontal-scroll overflow the old chip row had.
           Row(
             children: [
-              Expanded(
-                child: TextField(
-                  decoration: const InputDecoration(
-                    hintText: 'Search items…',
-                    prefixIcon: Icon(Icons.search, size: 20),
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(vertical: 10),
-                  ),
-                  onChanged: app.setSearch,
+              IconButton(
+                tooltip: _searchVisible ? 'Hide search' : 'Search items',
+                icon: Icon(_searchVisible ? Icons.search_off : Icons.search),
+                onPressed: _toggleSearch,
+              ),
+              Badge(
+                label: Text('$activeFilterCount'),
+                isLabelVisible: activeFilterCount > 0,
+                child: IconButton(
+                  tooltip: 'Filter by status',
+                  icon: const Icon(Icons.filter_list),
+                  onPressed: _openStatusFilterSheet,
                 ),
               ),
-              const SizedBox(width: 4),
               IconButton(
                 tooltip: app.boardView == BoardView.list
                     ? 'Switch to kanban view'
@@ -247,29 +315,40 @@ class _BoardControls extends StatelessWidget {
                 ),
                 onPressed: app.cycleBoardView,
               ),
+              const Spacer(),
+              if (!app.showArchived)
+                IconButton(
+                  tooltip: 'Archive completed',
+                  icon: const Icon(Icons.archive_outlined),
+                  onPressed: () => _archiveCompleted(context, board),
+                ),
             ],
           ),
-          const SizedBox(height: 6),
-          SizedBox(
-            height: 34,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                for (final status in itemStatuses)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: FilterChip(
-                      label: Text(status, style: const TextStyle(fontSize: 12)),
-                      selected: app.statusFilter.contains(status),
-                      selectedColor: AppTheme.statusColor(
-                        status,
-                        Theme.of(context).colorScheme,
-                      ).withValues(alpha: 0.2),
-                      onSelected: (_) => app.toggleStatusFilter(status),
-                    ),
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 150),
+            crossFadeState: _searchVisible
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
+            firstChild: Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Search items…',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.close, size: 18),
+                    tooltip: 'Clear search',
+                    onPressed: _toggleSearch,
                   ),
-              ],
+                ),
+                onChanged: app.setSearch,
+              ),
             ),
+            secondChild: const SizedBox(width: double.infinity, height: 0),
           ),
         ],
       ),
@@ -307,7 +386,7 @@ class _ListView extends StatelessWidget {
                     child: Center(
                       child: Text(showArchived
                           ? 'No archived items'
-                          : 'No action items — add one with +'),
+                          : 'No action items — add one with the + button'),
                     ),
                   ),
                 ],
