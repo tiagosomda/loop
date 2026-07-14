@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/models.dart';
 import '../services/board_service.dart';
+import '../widgets/attachment_gallery.dart';
 import '../widgets/widgets.dart';
 
 class ItemScreen extends StatefulWidget {
@@ -396,6 +397,7 @@ class _Thread extends StatelessWidget {
         if (messages.isEmpty) {
           return const Center(child: Text('No messages yet.'));
         }
+        final galleryAttachments = imageAttachmentsInThread(messages);
         return ListView.builder(
           reverse: true,
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -405,6 +407,7 @@ class _Thread extends StatelessWidget {
             return _MessageBubble(
               itemId: itemId,
               message: messages[index],
+              galleryAttachments: galleryAttachments,
               // "Replied to" = anything exists after it in the thread.
               hasSubsequent: index < messages.length - 1,
             );
@@ -420,11 +423,13 @@ class _MessageBubble extends StatelessWidget {
     required this.itemId,
     required this.message,
     required this.hasSubsequent,
+    required this.galleryAttachments,
   });
 
   final String itemId;
   final ThreadMessage message;
   final bool hasSubsequent;
+  final List<Attachment> galleryAttachments;
 
   @override
   Widget build(BuildContext context) {
@@ -495,7 +500,12 @@ class _MessageBubble extends StatelessWidget {
                     runSpacing: 8,
                     children: [
                       for (final a in message.attachments)
-                        AttachmentView(attachment: a),
+                        AttachmentView(
+                          attachment: a,
+                          onOpenImage: a.isImage
+                              ? () => _openGallery(context, a)
+                              : null,
+                        ),
                     ],
                   ),
                 ],
@@ -503,6 +513,22 @@ class _MessageBubble extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _openGallery(BuildContext context, Attachment attachment) {
+    final initialIndex = galleryAttachments.indexOf(attachment);
+    if (initialIndex < 0) return;
+    final board = context.read<BoardService>();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (context) => AttachmentGallery(
+          attachments: galleryAttachments,
+          initialIndex: initialIndex,
+          resolveUrl: board.downloadUrl,
+        ),
       ),
     );
   }

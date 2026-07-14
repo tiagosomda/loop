@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -129,9 +130,10 @@ class ItemCard extends StatelessWidget {
 
 /// Renders an attachment: inline preview for images, download chip otherwise.
 class AttachmentView extends StatelessWidget {
-  const AttachmentView({super.key, required this.attachment});
+  const AttachmentView({super.key, required this.attachment, this.onOpenImage});
 
   final Attachment attachment;
+  final VoidCallback? onOpenImage;
 
   @override
   Widget build(BuildContext context) {
@@ -151,11 +153,36 @@ class AttachmentView extends StatelessWidget {
         }
         final url = snap.data!;
         if (attachment.isImage) {
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 240, maxWidth: 320),
-              child: Image.network(url, fit: BoxFit.contain),
+          return Semantics(
+            button: true,
+            excludeSemantics: true,
+            label: 'Open ${attachment.name} in image gallery',
+            child: Tooltip(
+              message: 'Open ${attachment.name}',
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: onOpenImage,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxHeight: 240,
+                      maxWidth: 320,
+                    ),
+                    child: attachment.isSvg
+                        ? SvgPicture.network(
+                            url,
+                            fit: BoxFit.contain,
+                            semanticsLabel: attachment.name,
+                          )
+                        : Image.network(
+                            url,
+                            fit: BoxFit.contain,
+                            semanticLabel: attachment.name,
+                          ),
+                  ),
+                ),
+              ),
             ),
           );
         }

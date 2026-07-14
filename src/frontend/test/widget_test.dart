@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:dev_loop/models/models.dart';
 import 'package:dev_loop/services/board_service.dart';
+import 'package:dev_loop/widgets/attachment_gallery.dart';
 import 'package:dev_loop/widgets/brand_logo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -174,6 +176,149 @@ void main() {
 
     test('ActionItem defaults to not archived', () {
       expect(item(archived: false).archived, isFalse);
+    });
+  });
+
+  group('thread image gallery', () {
+    Attachment attachment(String name, String contentType) => Attachment(
+      name: name,
+      storagePath: 'attachments/$name',
+      contentType: contentType,
+      size: 1,
+    );
+
+    test('collects only images in chronological attachment order', () {
+      final firstImage = attachment('first.png', 'image/png');
+      final document = attachment('notes.pdf', 'application/pdf');
+      final secondImage = attachment('second.jpg', 'image/jpeg');
+      final thirdImage = attachment('third.webp', 'image/webp');
+      final messages = [
+        ThreadMessage(
+          id: 'one',
+          author: 'user',
+          text: '',
+          attachments: [firstImage, document, secondImage],
+        ),
+        ThreadMessage(
+          id: 'two',
+          author: 'agent',
+          text: '',
+          attachments: [thirdImage],
+        ),
+      ];
+
+      expect(imageAttachmentsInThread(messages), [
+        same(firstImage),
+        same(secondImage),
+        same(thirdImage),
+      ]);
+    });
+
+    test('recognizes SVG image attachments for gallery rendering', () {
+      expect(attachment('diagram.svg', 'image/svg+xml').isSvg, isTrue);
+      expect(attachment('photo.png', 'image/png').isSvg, isFalse);
+    });
+
+    testWidgets('starts at the tapped image and navigates previous and next', (
+      tester,
+    ) async {
+      final images = [
+        attachment('first.png', 'image/png'),
+        attachment('second.png', 'image/png'),
+        attachment('third.png', 'image/png'),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(splashFactory: NoSplash.splashFactory),
+          home: AttachmentGallery(
+            attachments: images,
+            initialIndex: 1,
+            // Leaving these unresolved keeps the test independent of network
+            // image fetching while exercising the real gallery controls.
+            resolveUrl: (_) => Completer<String>().future,
+          ),
+        ),
+      );
+
+      expect(find.text('second.png'), findsOneWidget);
+      expect(find.text('2 of 3'), findsOneWidget);
+
+      await tester.tap(find.widgetWithIcon(IconButton, Icons.chevron_right));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('third.png'), findsOneWidget);
+      expect(find.text('3 of 3'), findsOneWidget);
+      expect(
+        tester
+            .widget<IconButton>(
+              find.widgetWithIcon(IconButton, Icons.chevron_right),
+            )
+            .onPressed,
+        isNull,
+      );
+
+      await tester.tap(find.widgetWithIcon(IconButton, Icons.chevron_left));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('second.png'), findsOneWidget);
+      expect(find.text('2 of 3'), findsOneWidget);
+    });
+
+    testWidgets('zoom controls update and reset the current image scale', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(splashFactory: NoSplash.splashFactory),
+          home: AttachmentGallery(
+            attachments: [attachment('photo.png', 'image/png')],
+            initialIndex: 0,
+            resolveUrl: (_) => Completer<String>().future,
+          ),
+        ),
+      );
+
+      expect(
+        tester
+            .widget<IconButton>(find.widgetWithIcon(IconButton, Icons.zoom_out))
+            .onPressed,
+        isNull,
+      );
+      expect(
+        tester
+            .widget<IconButton>(
+              find.widgetWithIcon(IconButton, Icons.fit_screen),
+            )
+            .onPressed,
+        isNull,
+      );
+
+      await tester.tap(find.byTooltip('Zoom in'));
+      await tester.pump();
+      expect(
+        tester
+            .widget<IconButton>(find.widgetWithIcon(IconButton, Icons.zoom_out))
+            .onPressed,
+        isNotNull,
+      );
+      expect(
+        tester
+            .widget<IconButton>(
+              find.widgetWithIcon(IconButton, Icons.fit_screen),
+            )
+            .onPressed,
+        isNotNull,
+      );
+
+      await tester.tap(find.byTooltip('Reset zoom'));
+      await tester.pump();
+      expect(
+        tester
+            .widget<IconButton>(find.widgetWithIcon(IconButton, Icons.zoom_out))
+            .onPressed,
+        isNull,
+      );
     });
   });
 

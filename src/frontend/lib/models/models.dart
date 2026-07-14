@@ -99,6 +99,8 @@ class Attachment {
   });
 
   bool get isImage => contentType.startsWith('image/');
+  bool get isSvg =>
+      contentType == 'image/svg+xml' || name.toLowerCase().endsWith('.svg');
 
   factory Attachment.fromMap(Map<String, dynamic> m) => Attachment(
     name: m['name'] ?? 'file',
@@ -147,6 +149,18 @@ class ThreadMessage {
     );
   }
 }
+
+/// The image attachments available to a thread gallery, in reading order.
+///
+/// Messages are supplied oldest-first by the thread query.
+/// Keeping that order, followed by each message's attachment order, makes
+/// previous/next navigation predictable even when a thread has several image
+/// uploads spread across replies.
+List<Attachment> imageAttachmentsInThread(Iterable<ThreadMessage> messages) => [
+  for (final message in messages)
+    for (final attachment in message.attachments)
+      if (attachment.isImage) attachment,
+];
 
 class RepoInfo {
   final String id;
