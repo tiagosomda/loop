@@ -265,7 +265,43 @@ void main() {
       expect(find.text('2 of 3'), findsOneWidget);
     });
 
-    testWidgets('zoom controls update and reset the current image scale', (
+    testWidgets('one-finger horizontal drag navigates at minimum zoom', (
+      tester,
+    ) async {
+      final images = [
+        attachment('first.png', 'image/png'),
+        attachment('second.png', 'image/png'),
+        attachment('third.png', 'image/png'),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(splashFactory: NoSplash.splashFactory),
+          home: AttachmentGallery(
+            attachments: images,
+            initialIndex: 1,
+            resolveUrl: (_) => Completer<String>().future,
+          ),
+        ),
+      );
+
+      final currentImage = find.byType(InteractiveViewer).hitTestable();
+      expect(currentImage, findsOneWidget);
+
+      await tester.drag(currentImage, const Offset(-240, 0));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('third.png'), findsOneWidget);
+      expect(find.text('3 of 3'), findsOneWidget);
+
+      await tester.drag(currentImage, const Offset(240, 0));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('second.png'), findsOneWidget);
+      expect(find.text('2 of 3'), findsOneWidget);
+    });
+
+    testWidgets('pan then zoom-out restores identity at minimum scale', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -296,6 +332,21 @@ void main() {
 
       await tester.tap(find.byTooltip('Zoom in'));
       await tester.pump();
+      final viewer = tester.widget<InteractiveViewer>(
+        find.byType(InteractiveViewer).hitTestable(),
+      );
+      final transformationController = viewer.transformationController!;
+      final beforePan = List<double>.of(transformationController.value.storage);
+
+      await tester.drag(
+        find.byType(InteractiveViewer).hitTestable(),
+        const Offset(80, 30),
+      );
+      await tester.pump();
+      expect(
+        transformationController.value.storage,
+        isNot(orderedEquals(beforePan)),
+      );
       expect(
         tester
             .widget<IconButton>(find.widgetWithIcon(IconButton, Icons.zoom_out))
@@ -311,13 +362,38 @@ void main() {
         isNotNull,
       );
 
-      await tester.tap(find.byTooltip('Reset zoom'));
+      await tester.tap(find.byTooltip('Zoom out'));
       await tester.pump();
+      expect(
+        transformationController.value.storage,
+        orderedEquals(Matrix4.identity().storage),
+      );
       expect(
         tester
             .widget<IconButton>(find.widgetWithIcon(IconButton, Icons.zoom_out))
             .onPressed,
         isNull,
+      );
+
+      // If a platform gesture ever leaves translation behind at 1x, Reset
+      // must remain available instead of looking only at scale.
+      transformationController.value = Matrix4.identity()
+        ..translateByDouble(12, 8, 0, 1);
+      await tester.pump();
+      expect(
+        tester
+            .widget<IconButton>(
+              find.widgetWithIcon(IconButton, Icons.fit_screen),
+            )
+            .onPressed,
+        isNotNull,
+      );
+
+      await tester.tap(find.byTooltip('Reset zoom'));
+      await tester.pump();
+      expect(
+        transformationController.value.storage,
+        orderedEquals(Matrix4.identity().storage),
       );
     });
   });

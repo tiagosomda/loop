@@ -81,6 +81,10 @@ class _AttachmentGalleryState extends State<AttachmentGallery> {
     final controller = _transformControllers[_index];
     final currentScale = controller.value.getMaxScaleOnAxis();
     final targetScale = (currentScale * factor).clamp(_minScale, _maxScale);
+    if (targetScale <= _minScale + 0.001) {
+      controller.value = Matrix4.identity();
+      return;
+    }
     final appliedFactor = targetScale / currentScale;
     if ((appliedFactor - 1).abs() < 0.001) return;
 
@@ -155,12 +159,20 @@ class _AttachmentGalleryState extends State<AttachmentGallery> {
               children: [
                 PageView.builder(
                   controller: _pageController,
+                  // InteractiveViewer's scale recognizer owns one-finger
+                  // drags even at 1x. Gallery pages detect those raw pointer
+                  // swipes explicitly; disabling PageView's competing drag
+                  // recognizer also guarantees a zoomed image keeps the same
+                  // gesture for panning.
+                  physics: const NeverScrollableScrollPhysics(),
                   itemCount: widget.attachments.length,
                   onPageChanged: (index) => setState(() => _index = index),
                   itemBuilder: (context, index) => _GalleryPage(
                     attachment: widget.attachments[index],
                     url: _urls[index],
                     transformationController: _transformControllers[index],
+                    onSwipePrevious: _showPrevious,
+                    onSwipeNext: _showNext,
                   ),
                 ),
                 Align(
@@ -177,6 +189,9 @@ class _AttachmentGalleryState extends State<AttachmentGallery> {
                         builder: (context, _) {
                           final scale = _transformControllers[_index].value
                               .getMaxScaleOnAxis();
+                          final isIdentity = _isIdentityTransform(
+                            _transformControllers[_index].value,
+                          );
                           return Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -197,9 +212,7 @@ class _AttachmentGalleryState extends State<AttachmentGallery> {
                               IconButton(
                                 tooltip: 'Reset zoom',
                                 color: Colors.white,
-                                onPressed: scale > _minScale + 0.01
-                                    ? _resetZoom
-                                    : null,
+                                onPressed: isIdentity ? null : _resetZoom,
                                 icon: const Icon(Icons.fit_screen),
                               ),
                               IconButton(
@@ -232,80 +245,161 @@ class _AttachmentGalleryState extends State<AttachmentGallery> {
   }
 }
 
-class _GalleryPage extends StatelessWidget {
+class _GalleryPage extends StatefulWidget {
   const _GalleryPage({
     required this.attachment,
     required this.url,
     required this.transformationController,
+    required this.onSwipePrevious,
+    required this.onSwipeNext,
   });
 
   final Attachment attachment;
   final Future<String> url;
   final TransformationController transformationController;
+  final VoidCallback onSwipePrevious;
+  final VoidCallback onSwipeNext;
+
+  @override
+  State<_GalleryPage> createState() => _GalleryPageState();
+}
+
+class _GalleryPageState extends State<_GalleryPage> {
+  static const _swipeThreshold = 48.0;
+  static const _minimumHorizontalRatio = 1.2;
+
+  int? _swipePointer;
+  Offset _swipeDelta = Offset.zero;
+  bool _swipeEligible = false;
+
+  void _onPointerDown(PointerDownEvent event) {
+    if (_swipePointer != null) {
+      // A second pointer means this is a pinch, not gallery navigation.
+      _swipeEligible = false;
+      return;
+    }
+    _swipePointer = event.pointer;
+    _swipeDelta = Offset.zero;
+    _swipeEligible =
+        widget.transformationController.value.getMaxScaleOnAxis() <= 1.001;
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    if (event.pointer == _swipePointer && _swipeEligible) {
+      _swipeDelta += event.delta;
+    }
+  }
+
+  void _onPointerUp(PointerUpEvent event) {
+    if (event.pointer != _swipePointer) return;
+    final scale = widget.transformationController.value.getMaxScaleOnAxis();
+    final isHorizontal =
+        _swipeDelta.dx.abs() >= _swipeThreshold &&
+        _swipeDelta.dx.abs() >= _swipeDelta.dy.abs() * _minimumHorizontalRatio;
+    final shouldNavigate = _swipeEligible && scale <= 1.001 && isHorizontal;
+    final deltaX = _swipeDelta.dx;
+    _clearSwipe();
+    if (!shouldNavigate) return;
+    if (deltaX < 0) {
+      widget.onSwipeNext();
+    } else {
+      widget.onSwipePrevious();
+    }
+  }
+
+  void _clearSwipe() {
+    _swipePointer = null;
+    _swipeDelta = Offset.zero;
+    _swipeEligible = false;
+  }
+
+  void _normalizeMinimumScale() {
+    final matrix = widget.transformationController.value;
+    if (matrix.getMaxScaleOnAxis() <= 1.001 && !_isIdentityTransform(matrix)) {
+      widget.transformationController.value = Matrix4.identity();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 88),
-      child: InteractiveViewer(
-        transformationController: transformationController,
-        minScale: _AttachmentGalleryState._minScale,
-        maxScale: _AttachmentGalleryState._maxScale,
-        child: Center(
-          child: FutureBuilder<String>(
-            future: url,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return Semantics(
-                  liveRegion: true,
-                  child: const Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.broken_image_outlined,
-                        color: Colors.white70,
-                        size: 48,
-                      ),
-                      SizedBox(height: 12),
-                      Text(
-                        'Could not load image',
-                        style: TextStyle(color: Colors.white70),
-                      ),
-                    ],
-                  ),
-                );
-              }
-              if (!snapshot.hasData) {
-                return const CircularProgressIndicator(
-                  color: Colors.white,
-                  semanticsLabel: 'Loading image',
-                );
-              }
-              if (attachment.isSvg) {
-                return SvgPicture.network(
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: _onPointerDown,
+      onPointerMove: _onPointerMove,
+      onPointerUp: _onPointerUp,
+      onPointerCancel: (_) => _clearSwipe(),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 88),
+        child: InteractiveViewer(
+          transformationController: widget.transformationController,
+          minScale: _AttachmentGalleryState._minScale,
+          maxScale: _AttachmentGalleryState._maxScale,
+          onInteractionEnd: (_) => _normalizeMinimumScale(),
+          child: Center(
+            child: FutureBuilder<String>(
+              future: widget.url,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Semantics(
+                    liveRegion: true,
+                    child: const Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.broken_image_outlined,
+                          color: Colors.white70,
+                          size: 48,
+                        ),
+                        SizedBox(height: 12),
+                        Text(
+                          'Could not load image',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                if (!snapshot.hasData) {
+                  return const CircularProgressIndicator(
+                    color: Colors.white,
+                    semanticsLabel: 'Loading image',
+                  );
+                }
+                if (widget.attachment.isSvg) {
+                  return SvgPicture.network(
+                    snapshot.data!,
+                    fit: BoxFit.contain,
+                    semanticsLabel: widget.attachment.name,
+                    placeholderBuilder: (context) => const _ImageLoading(),
+                    errorBuilder: (context, error, stackTrace) =>
+                        const _ImageDisplayError(),
+                  );
+                }
+                return Image.network(
                   snapshot.data!,
                   fit: BoxFit.contain,
-                  semanticsLabel: attachment.name,
-                  placeholderBuilder: (context) => const _ImageLoading(),
+                  semanticLabel: widget.attachment.name,
+                  loadingBuilder: (context, child, progress) =>
+                      progress == null ? child : const _ImageLoading(),
                   errorBuilder: (context, error, stackTrace) =>
                       const _ImageDisplayError(),
                 );
-              }
-              return Image.network(
-                snapshot.data!,
-                fit: BoxFit.contain,
-                semanticLabel: attachment.name,
-                loadingBuilder: (context, child, progress) =>
-                    progress == null ? child : const _ImageLoading(),
-                errorBuilder: (context, error, stackTrace) =>
-                    const _ImageDisplayError(),
-              );
-            },
+              },
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+bool _isIdentityTransform(Matrix4 matrix) {
+  final identity = Matrix4.identity().storage;
+  final values = matrix.storage;
+  for (var i = 0; i < values.length; i++) {
+    if ((values[i] - identity[i]).abs() > 0.001) return false;
+  }
+  return true;
 }
 
 class _ImageLoading extends StatelessWidget {
