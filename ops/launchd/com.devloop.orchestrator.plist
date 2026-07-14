@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.devloop.orchestrator</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/somdax/dev/tiagosomda/dev-loop/src/backend/.venv/bin/python</string>
+    <string>/Users/somdax/dev/tiagosomda/dev-loop/src/backend/devloop.py</string>
+    <string>run</string>
+    <string>autonomous</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/somdax/dev/tiagosomda/dev-loop</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Applications/ChatGPT.app/Contents/Resources</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>0</integer><key>Minute</key><integer>15</integer></dict>
+    <dict><key>Hour</key><integer>5</integer><key>Minute</key><integer>15</integer></dict>
+    <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>15</integer></dict>
+    <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>15</integer></dict>
+    <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>15</integer></dict>
+  </array>
+  <key>StandardOutPath</key>
+  <string>/Users/somdax/dev/tiagosomda/dev-loop/data/orchestrator.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/somdax/dev/tiagosomda/dev-loop/data/orchestrator.error.log</string>
+</dict>
+</plist>

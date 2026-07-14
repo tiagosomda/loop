@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.devloop.llama-server</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/llama-server</string>
+    <string>--hf-repo</string>
+    <string>ggml-org/gemma-3-4b-it-GGUF</string>
+    <string>--hf-file</string>
+    <string>gemma-3-4b-it-Q4_K_M.gguf</string>
+    <string>--ctx-size</string>
+    <string>4096</string>
+    <string>--n-gpu-layers</string>
+    <string>99</string>
+    <string>--host</string>
+    <string>127.0.0.1</string>
+    <string>--port</string>
+    <string>8080</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/Users/somdax/dev/tiagosomda/dev-loop/data/llama-server.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/somdax/dev/tiagosomda/dev-loop/data/llama-server.error.log</string>
+</dict>
+</plist>

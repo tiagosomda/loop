@@ -1,6 +1,6 @@
 # Task 08: Integration, operations, and rollout
 
-Status: pending
+Status: in-progress
 
 ## Scope
 

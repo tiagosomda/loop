@@ -123,6 +123,9 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--note", help="override the auto-derived touched-items summary")
     p = sub.add_parser("stale", help="check for a prior run's WIP branch/worktree")
     p.add_argument("id")
+    p = sub.add_parser("autonomous", help="route and dispatch the queue locally")
+    p.add_argument("--max-items", type=int,
+                   help="optional bounded item count for manual rollout checks")
 
     # targets
     targets = top.add_parser("targets", help="safe provider target catalog")
@@ -211,6 +214,12 @@ def main(argv: list[str] | None = None) -> None:
             print(mod.end(note=args.note))
         elif args.cmd == "stale":
             _print(mod.check_stale(args.id))
+        elif args.cmd == "autonomous":
+            from devloop import autonomous
+            try:
+                _print(autonomous.execute(max_items=args.max_items))
+            except autonomous.AlreadyRunning as exc:
+                _print({"alreadyRunning": True, "message": str(exc)})
     elif args.group == "runlog":
         from devloop import runlog as mod
         if args.cmd == "add":
