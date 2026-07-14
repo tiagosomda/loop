@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["outcome", "summary", "filesChanged", "verification"],
+  "properties": {
+    "outcome": {
+      "enum": ["succeeded", "needs-review", "failed", "timed-out", "cancelled"]
+    },
+    "summary": {"type": "string"},
+    "filesChanged": {"type": "array", "items": {"type": "string"}},
+    "verification": {"type": "array", "items": {"type": "string"}},
+    "providerReference": {"type": ["string", "null"]},
+    "metadata": {"type": "object"}
+  }
+}

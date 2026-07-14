@@ -32,6 +32,8 @@ DATA_DIR = REPO_ROOT / "data"
 DEV_ROOT = REPO_ROOT / "dev"
 RULES_DIR = Path(__file__).resolve().parents[1] / "rules"
 TARGETS_FILE = Path(__file__).resolve().parents[1] / "config" / "targets.json"
+WORKER_RESULT_SCHEMA = (Path(__file__).resolve().parents[1] /
+                        "config" / "worker-result.schema.json")
 
 
 def service_account_path() -> Path:
