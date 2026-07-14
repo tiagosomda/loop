@@ -159,17 +159,17 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-/// Shows a confirmation dialog, then archives every currently-completed
+/// Shows a confirmation dialog, then archives every currently-closed
 /// item. Lives at top level (not on [HomeScreen]) so both the screen and
 /// [_BoardControls] can trigger it.
-Future<void> _archiveCompleted(BuildContext context, BoardService board) async {
+Future<void> _archiveClosed(BuildContext context, BoardService board) async {
   final messenger = ScaffoldMessenger.of(context);
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Archive completed items'),
+      title: const Text('Archive closed items'),
       content: const Text(
-        'Archive every item currently marked completed? They stay searchable '
+        'Archive every item currently marked closed? They stay searchable '
         'in the archived view and can be restored anytime.',
       ),
       actions: [
@@ -186,11 +186,11 @@ Future<void> _archiveCompleted(BuildContext context, BoardService board) async {
   );
   if (confirmed != true) return;
   try {
-    final n = await board.archiveCompleted();
+    final n = await board.archiveClosed();
     messenger.showSnackBar(SnackBar(
       content: Text(n == 0
-          ? 'No completed items to archive'
-          : 'Archived $n completed item${n == 1 ? '' : 's'}'),
+          ? 'No closed items to archive'
+          : 'Archived $n closed item${n == 1 ? '' : 's'}'),
     ));
   } catch (e) {
     messenger.showSnackBar(SnackBar(content: Text('Failed to archive: $e')));
@@ -285,7 +285,7 @@ class _BoardControlsState extends State<_BoardControls> {
       child: Column(
         children: [
           // A single compact row of icon controls — search toggle, status
-          // filter, board-view toggle, and (when relevant) archive-completed
+          // filter, board-view toggle, and (when relevant) archive-closed
           // — so everything fits on a narrow phone width without the
           // horizontal-scroll overflow the old chip row had.
           Row(
@@ -318,9 +318,9 @@ class _BoardControlsState extends State<_BoardControls> {
               const Spacer(),
               if (!app.showArchived)
                 IconButton(
-                  tooltip: 'Archive completed',
+                  tooltip: 'Archive closed',
                   icon: const Icon(Icons.archive_outlined),
-                  onPressed: () => _archiveCompleted(context, board),
+                  onPressed: () => _archiveClosed(context, board),
                 ),
             ],
           ),

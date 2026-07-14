@@ -147,11 +147,11 @@ class BoardService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-  /// Archive every completed, not-yet-archived item in one batch. Returns the
+  /// Archive every closed, not-yet-archived item in one batch. Returns the
   /// number of items archived.
-  Future<int> archiveCompleted() async {
+  Future<int> archiveClosed() async {
     final snap =
-        await _items.where('status', isEqualTo: 'completed').get();
+        await _items.where('status', isEqualTo: 'closed').get();
     final batch = _db.batch();
     var count = 0;
     for (final doc in snap.docs) {

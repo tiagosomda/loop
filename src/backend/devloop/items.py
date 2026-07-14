@@ -197,13 +197,13 @@ def unarchive_item(item_id: str) -> None:
     })
 
 
-def archive_completed() -> list[str]:
-    """Archive every non-archived item currently in the `completed` status.
+def archive_closed() -> list[str]:
+    """Archive every non-archived item currently in the `closed` status.
 
     Returns the ids that were archived (skips ones already archived).
     """
     query = _items().where(
-        filter=firestore.firestore.FieldFilter("status", "in", ["completed"])
+        filter=firestore.firestore.FieldFilter("status", "in", ["closed"])
     )
     archived: list[str] = []
     for doc in query.stream():

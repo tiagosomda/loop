@@ -8,7 +8,7 @@ Examples:
     ./devloop.py items status <id> needs-review
     ./devloop.py items reorder <id> 1500        # set manual board position
     ./devloop.py items archive <id>            # archive one item
-    ./devloop.py items archive --completed     # bulk-archive completed items
+    ./devloop.py items archive --closed        # bulk-archive closed items
     ./devloop.py items unarchive <id>
     ./devloop.py repos crawl
     ./devloop.py schedule update --mark-run
@@ -77,10 +77,10 @@ def main(argv: list[str] | None = None) -> None:
                         "this sets it directly)")
 
     p = sub.add_parser("archive",
-                       help="archive an item by id, or all completed with --completed")
-    p.add_argument("id", nargs="?", help="item id (omit when using --completed)")
-    p.add_argument("--completed", action="store_true",
-                   help="bulk-archive every completed, non-archived item")
+                       help="archive an item by id, or all closed with --closed")
+    p.add_argument("id", nargs="?", help="item id (omit when using --closed)")
+    p.add_argument("--closed", action="store_true",
+                   help="bulk-archive every closed, non-archived item")
 
     p = sub.add_parser("unarchive", help="restore an archived item to the board")
     p.add_argument("id")
@@ -161,14 +161,14 @@ def main(argv: list[str] | None = None) -> None:
             mod.set_order(args.id, args.value)
             print(f"{args.id} -> order {args.value}")
         elif args.cmd == "archive":
-            if args.completed:
-                ids = mod.archive_completed()
-                print(f"archived {len(ids)} completed item(s): {', '.join(ids) or '(none)'}")
+            if args.closed:
+                ids = mod.archive_closed()
+                print(f"archived {len(ids)} closed item(s): {', '.join(ids) or '(none)'}")
             elif args.id:
                 mod.archive_item(args.id)
                 print(f"{args.id} -> archived")
             else:
-                raise SystemExit("pass an item id or --completed")
+                raise SystemExit("pass an item id or --closed")
         elif args.cmd == "unarchive":
             mod.unarchive_item(args.id)
             print(f"{args.id} -> unarchived")
