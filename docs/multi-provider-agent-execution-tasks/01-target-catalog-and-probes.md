@@ -1,6 +1,6 @@
 # Task 01: Target catalog and probes
 
-Status: in-progress
+Status: completed
 
 ## Scope
 
@@ -19,4 +19,12 @@ Status: in-progress
 
 ## Completion evidence
 
-Pending.
+- Added `src/backend/config/targets.json` with enabled local-router and Codex
+  targets plus a disabled Claude target.
+- Added strict catalog validation, deterministic probes, and a secret-free
+  projection in `devloop.targets`.
+- Added `devloop targets list` with role and enabled filters.
+- Seven unit tests pass, including configuration-only Claude enablement and
+  safe-field filtering.
+- Live `targets list --role worker --enabled-only` returned only the available
+  Codex target while Claude remained disabled.

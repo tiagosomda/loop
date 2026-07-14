@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "2026-07-14.1",
+  "targets": [
+    {
+      "targetId": "local-gemma-router",
+      "role": "router",
+      "adapter": "llama-cpp",
+      "location": "local",
+      "enabled": true,
+      "models": ["gemma-3-4b-it"],
+      "effortLevels": ["low"],
+      "endpoint": "http://127.0.0.1:8080",
+      "contextLimit": 4096,
+      "supportsImages": false,
+      "supportsRepositoryWrites": false,
+      "supportsNetwork": false,
+      "costTier": "free",
+      "concurrencyLimit": 1
+    },
+    {
+      "targetId": "codex-standard",
+      "role": "worker",
+      "adapter": "codex",
+      "location": "cloud",
+      "enabled": true,
+      "models": ["default"],
+      "effortLevels": ["low", "medium", "high", "max"],
+      "executable": "codex",
+      "supportsImages": true,
+      "supportsRepositoryWrites": true,
+      "supportsNetwork": true,
+      "costTier": "medium",
+      "concurrencyLimit": 1
+    },
+    {
+      "targetId": "claude-standard",
+      "role": "worker",
+      "adapter": "claude-code",
+      "location": "cloud",
+      "enabled": false,
+      "models": ["default", "sonnet", "opus"],
+      "effortLevels": ["low", "medium", "high"],
+      "executable": "claude",
+      "supportsImages": true,
+      "supportsRepositoryWrites": true,
+      "supportsNetwork": true,
+      "costTier": "medium",
+      "concurrencyLimit": 1
+    }
+  ]
+}

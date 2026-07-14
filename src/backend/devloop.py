@@ -16,6 +16,7 @@ Examples:
     ./devloop.py run next                      # next item to claim, or null
     ./devloop.py run stale <id>                 # look for a prior WIP branch/worktree
     ./devloop.py run end --note "..."           # log "run finished: ..."
+    ./devloop.py targets list --role worker --enabled-only
     ./devloop.py rules pull && ./devloop.py rules merge && ./devloop.py rules deploy
 """
 
@@ -122,6 +123,13 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("stale", help="check for a prior run's WIP branch/worktree")
     p.add_argument("id")
 
+    # targets
+    targets = top.add_parser("targets", help="safe provider target catalog")
+    sub = targets.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("list", help="list safe target capabilities and availability")
+    p.add_argument("--role", choices=["router", "worker"])
+    p.add_argument("--enabled-only", action="store_true")
+
     # rules
     rules = top.add_parser("rules", help="shared security-rules management")
     sub = rules.add_subparsers(dest="cmd", required=True)
@@ -197,6 +205,11 @@ def main(argv: list[str] | None = None) -> None:
             print(mod.log(args.message))
         elif args.cmd == "tail":
             print("\n".join(mod.tail(args.n)) or "(empty)")
+    elif args.group == "targets":
+        from devloop import targets as mod
+        if args.cmd == "list":
+            _print(mod.safe_projection(role=args.role,
+                                       enabled_only=args.enabled_only))
     elif args.group == "rules":
         from devloop import rules as mod
         if args.cmd == "pull":

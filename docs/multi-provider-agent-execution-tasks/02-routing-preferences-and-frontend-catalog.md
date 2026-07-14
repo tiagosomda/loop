@@ -1,6 +1,6 @@
 # Task 02: Routing preferences and frontend catalog
 
-Status: pending
+Status: in-progress
 
 ## Scope
 

@@ -22,7 +22,12 @@ python3 -m venv .venv
 .venv/bin/python devloop.py items status <id> needs-review
 .venv/bin/python devloop.py repos crawl            # sync dev/ repos to Firestore
 .venv/bin/python devloop.py schedule update --mark-run
+.venv/bin/python devloop.py targets list --role worker --enabled-only
 ```
+
+The target catalog lives in `config/targets.json`. Provider and model choices
+are data-driven: safe projections omit command paths and local endpoints, and
+`--enabled-only` excludes disabled providers such as the initial Claude target.
 
 ## Shared security rules — read before touching
 
