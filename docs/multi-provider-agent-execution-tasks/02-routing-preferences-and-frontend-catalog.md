@@ -28,6 +28,8 @@ Status: completed
   can edit all three routing preferences from a catalog-driven dialog.
 - Provider Auto exposes the deduplicated union across every published target;
   no first-target or static effort fallback remains.
+- Expanded routing controls use three columns when space permits and stack at
+  narrow widths; dropdown menus have a bounded, scrollable height.
 - Backend tests, Flutter static analysis, and Flutter tests pass.
 - Live publication was attempted but this checkout has no service-account
   credential; run `devloop targets publish` after configuring

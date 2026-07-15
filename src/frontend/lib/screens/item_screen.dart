@@ -258,10 +258,16 @@ Future<void> _editRoutingPreferences(
                     key: ValueKey('edit-model-$provider-$model'),
                     initialValue: model,
                     decoration: const InputDecoration(labelText: 'Model'),
+                    menuMaxHeight: 320,
                     items: [
                       const DropdownMenuItem(value: null, child: Text('Auto')),
                       for (final value in models)
-                        DropdownMenuItem(value: value, child: Text(value)),
+                        DropdownMenuItem(
+                          value: value,
+                          child: Text(
+                            catalog.modelLabel(value, adapter: provider),
+                          ),
+                        ),
                     ],
                     onChanged: models.isEmpty
                         ? null

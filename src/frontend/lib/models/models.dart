@@ -78,6 +78,7 @@ class RoutingTarget {
   final String adapter;
   final String location;
   final List<String> models;
+  final Map<String, String> modelLabels;
   final List<String> effortLevels;
 
   const RoutingTarget({
@@ -85,6 +86,7 @@ class RoutingTarget {
     required this.adapter,
     required this.location,
     required this.models,
+    this.modelLabels = const {},
     required this.effortLevels,
   });
 
@@ -95,6 +97,10 @@ class RoutingTarget {
     models: [
       for (final value in (map['models'] as List? ?? [])) value.toString(),
     ],
+    modelLabels: {
+      for (final entry in (map['modelLabels'] as Map? ?? const {}).entries)
+        entry.key.toString(): entry.value.toString(),
+    },
     effortLevels: [
       for (final value in (map['effortLevels'] as List? ?? []))
         value.toString(),
@@ -146,6 +152,15 @@ class RoutingCatalog {
       .expand((target) => target.effortLevels)
       .toSet()
       .toList(growable: false);
+
+  String modelLabel(String model, {String? adapter}) {
+    for (final target in targets) {
+      if (adapter != null && target.adapter != adapter) continue;
+      final label = target.modelLabels[model];
+      if (label != null) return label;
+    }
+    return model;
+  }
 }
 
 /// Whether [item] belongs on the board for the current archived toggle:

@@ -19,7 +19,7 @@ class DispatcherTests(unittest.TestCase):
         }
         self.decision = {
             "schemaVersion": 1, "itemId": "item-1", "targetId": "codex-standard",
-            "provider": "codex", "model": "default", "effort": "low",
+            "provider": "codex", "model": "gpt-5.6-terra", "effort": "low",
             "reasonCodes": ["small-change"], "confidence": "high",
         }
 

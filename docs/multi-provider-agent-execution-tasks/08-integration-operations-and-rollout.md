@@ -19,8 +19,8 @@ Status: in-progress
 
 In progress:
 
-- Forty-six backend tests pass.
-- Flutter analysis reports no issues and all 29 Flutter tests pass.
+- Fifty backend tests pass.
+- Flutter analysis reports no issues and all 30 Flutter tests pass.
 - Both LaunchAgent plists pass `plutil -lint`.
 - The llama-server LaunchAgent is installed and healthy. A controlled
   termination replaced PID 20835 with PID 20873 and returned healthy again,

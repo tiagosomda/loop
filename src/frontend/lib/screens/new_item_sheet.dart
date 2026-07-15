@@ -236,43 +236,86 @@ class _RoutingPreferences extends StatelessWidget {
       title: const Text('Execution: Automatic'),
       subtitle: const Text('The local router will choose an available worker.'),
       children: [
-        DropdownButtonFormField<String?>(
-          key: ValueKey('provider-$provider'),
-          initialValue: provider,
-          isExpanded: true,
-          decoration: const InputDecoration(labelText: 'Provider'),
-          items: [
-            const DropdownMenuItem(value: null, child: Text('Auto')),
-            for (final adapter in catalog.providers)
-              DropdownMenuItem(value: adapter, child: Text(adapter)),
-          ],
-          onChanged: onProvider,
-        ),
-        const SizedBox(height: 12),
-        DropdownButtonFormField<String?>(
-          key: ValueKey('model-$provider-$model'),
-          initialValue: model,
-          isExpanded: true,
-          decoration: const InputDecoration(labelText: 'Model'),
-          items: [
-            const DropdownMenuItem(value: null, child: Text('Auto')),
-            for (final value in models)
-              DropdownMenuItem(value: value, child: Text(value)),
-          ],
-          onChanged: models.isEmpty ? null : onModel,
-        ),
-        const SizedBox(height: 12),
-        DropdownButtonFormField<String?>(
-          key: ValueKey('effort-$provider-$effort'),
-          initialValue: effort,
-          isExpanded: true,
-          decoration: const InputDecoration(labelText: 'Effort'),
-          items: [
-            const DropdownMenuItem(value: null, child: Text('Auto')),
-            for (final value in efforts)
-              DropdownMenuItem(value: value, child: Text(value)),
-          ],
-          onChanged: onEffort,
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final fieldWidth = routingPreferenceFieldWidth(
+              constraints.maxWidth,
+            );
+            return Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: fieldWidth,
+                    child: DropdownButtonFormField<String?>(
+                      key: ValueKey('provider-$provider'),
+                      initialValue: provider,
+                      isExpanded: true,
+                      menuMaxHeight: 320,
+                      decoration: const InputDecoration(labelText: 'Provider'),
+                      items: [
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('Auto'),
+                        ),
+                        for (final adapter in catalog.providers)
+                          DropdownMenuItem(
+                            value: adapter,
+                            child: Text(adapter),
+                          ),
+                      ],
+                      onChanged: onProvider,
+                    ),
+                  ),
+                  SizedBox(
+                    width: fieldWidth,
+                    child: DropdownButtonFormField<String?>(
+                      key: ValueKey('model-$provider-$model'),
+                      initialValue: model,
+                      isExpanded: true,
+                      menuMaxHeight: 320,
+                      decoration: const InputDecoration(labelText: 'Model'),
+                      items: [
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('Auto'),
+                        ),
+                        for (final value in models)
+                          DropdownMenuItem(
+                            value: value,
+                            child: Text(
+                              catalog.modelLabel(value, adapter: provider),
+                            ),
+                          ),
+                      ],
+                      onChanged: models.isEmpty ? null : onModel,
+                    ),
+                  ),
+                  SizedBox(
+                    width: fieldWidth,
+                    child: DropdownButtonFormField<String?>(
+                      key: ValueKey('effort-$provider-$effort'),
+                      initialValue: effort,
+                      isExpanded: true,
+                      menuMaxHeight: 320,
+                      decoration: const InputDecoration(labelText: 'Effort'),
+                      items: [
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('Auto'),
+                        ),
+                        for (final value in efforts)
+                          DropdownMenuItem(value: value, child: Text(value)),
+                      ],
+                      onChanged: onEffort,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
         const SizedBox(height: 8),
         const Align(
@@ -286,6 +329,9 @@ class _RoutingPreferences extends StatelessWidget {
     );
   }
 }
+
+double routingPreferenceFieldWidth(double availableWidth) =>
+    availableWidth >= 720 ? (availableWidth - 24) / 3 : availableWidth;
 
 String _repoLabel(RepoInfo r) => r.path.isEmpty ? r.name : r.path;
 

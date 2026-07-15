@@ -21,6 +21,8 @@ Status: completed
 
 - Added `src/backend/config/targets.json` with enabled local-router and Codex
   targets plus a disabled Claude target.
+- The Codex target advertises the verified GPT-5.6 Sol, Terra, and Luna model
+  IDs with separate data-driven display labels.
 - Added strict catalog validation, deterministic probes, and a secret-free
   projection in `devloop.targets`.
 - Added `devloop targets list` with role and enabled filters.

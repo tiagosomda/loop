@@ -33,3 +33,5 @@ Status: completed
   pass. Claude remains disabled and was not live-invoked.
 - An isolated real Codex smoke run succeeded with no file changes, preserved
   seven provider events, and captured its provider thread reference.
+- Isolated CLI probes succeeded for `gpt-5.6-sol`, `gpt-5.6-terra`, and
+  `gpt-5.6-luna` with the authenticated macOS user.

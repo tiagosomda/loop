@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:dev_loop/models/models.dart';
 import 'package:dev_loop/services/board_service.dart';
+import 'package:dev_loop/screens/new_item_sheet.dart';
 import 'package:dev_loop/widgets/attachment_gallery.dart';
 import 'package:dev_loop/widgets/brand_logo.dart';
 import 'package:flutter/material.dart';
@@ -147,6 +148,7 @@ void main() {
           'adapter': 'codex',
           'location': 'cloud',
           'models': ['default', 'codex-special'],
+          'modelLabels': {'codex-special': 'Codex Special'},
           'effortLevels': ['low', 'high'],
         },
         {
@@ -177,6 +179,16 @@ void main() {
       'codex-second',
     ]);
     expect(catalog.effortsForProvider('codex'), ['low', 'high', 'medium']);
+    expect(
+      catalog.modelLabel('codex-special', adapter: 'codex'),
+      'Codex Special',
+    );
+    expect(catalog.modelLabel('unknown', adapter: 'codex'), 'unknown');
+  });
+
+  test('routing preferences use responsive widths', () {
+    expect(routingPreferenceFieldWidth(900), 292);
+    expect(routingPreferenceFieldWidth(719), 719);
   });
 
   test('routing labels render assignment and lifecycle state', () {

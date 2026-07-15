@@ -21,7 +21,8 @@ _ROLES = {"router", "worker"}
 _LOCATIONS = {"local", "cloud"}
 _EFFORTS = {"low", "medium", "high", "max"}
 _SAFE_FIELDS = (
-    "targetId", "role", "adapter", "location", "models", "effortLevels",
+    "targetId", "role", "adapter", "location", "models", "modelLabels",
+    "effortLevels",
     "contextLimit", "supportsImages", "supportsRepositoryWrites",
     "supportsNetwork", "costTier", "concurrencyLimit",
 )
@@ -71,6 +72,12 @@ def validate(catalog: dict[str, Any]) -> None:
             raise CatalogError(f"enabled must be boolean for {target_id!r}")
         if not _nonempty_strings(target["models"]):
             raise CatalogError(f"models must be non-empty strings for {target_id!r}")
+        labels = target.get("modelLabels", {})
+        if (not isinstance(labels, dict) or
+                set(labels) - set(target["models"]) or
+                not all(isinstance(label, str) and label
+                        for label in labels.values())):
+            raise CatalogError(f"invalid modelLabels for {target_id!r}")
         if (not _nonempty_strings(target["effortLevels"]) or
                 not set(target["effortLevels"]).issubset(_EFFORTS)):
             raise CatalogError(f"invalid effortLevels for {target_id!r}")

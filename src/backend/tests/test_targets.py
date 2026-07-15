@@ -20,6 +20,13 @@ class TargetCatalogTests(unittest.TestCase):
     def test_repository_catalog_is_valid(self):
         catalog = targets.load()
         self.assertEqual(1, catalog["schemaVersion"])
+        codex = next(target for target in catalog["targets"]
+                     if target["targetId"] == "codex-standard")
+        self.assertEqual(
+            ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"],
+            codex["models"],
+        )
+        self.assertEqual("GPT-5.6 Sol", codex["modelLabels"]["gpt-5.6-sol"])
 
     def test_duplicate_target_is_rejected(self):
         catalog = targets.load()
@@ -31,6 +38,12 @@ class TargetCatalogTests(unittest.TestCase):
         catalog = targets.load()
         catalog["targets"][0]["effortLevels"] = ["enormous"]
         with self.assertRaisesRegex(targets.CatalogError, "invalid effortLevels"):
+            targets.load(self._catalog_file(catalog))
+
+    def test_model_label_for_unknown_model_is_rejected(self):
+        catalog = targets.load()
+        catalog["targets"][1]["modelLabels"]["invented"] = "Invented"
+        with self.assertRaisesRegex(targets.CatalogError, "invalid modelLabels"):
             targets.load(self._catalog_file(catalog))
 
     @mock.patch("devloop.targets.subprocess.run")
