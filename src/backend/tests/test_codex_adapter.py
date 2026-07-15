@@ -74,6 +74,9 @@ class CodexAdapterTests(unittest.TestCase):
         self.assertEqual(1, result.metadata["providerEventCount"])
         self.assertIn('"role": "implementation-worker"', run.call_args.kwargs["input"])
         self.assertIn("Do not access dev-loop board credentials", run.call_args.kwargs["input"])
+        prompt = run.call_args.kwargs["input"]
+        self.assertIn("Commit all verified repository changes", prompt)
+        self.assertIn("Push the commit to the configured upstream", prompt)
 
     @mock.patch("devloop.adapters.codex.subprocess.run")
     def test_timeout_is_normalized(self, run):

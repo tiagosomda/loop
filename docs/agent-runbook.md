@@ -128,7 +128,7 @@ for their own sake.
    $PY $CLI items fetch <id> --new   # downloads to data/attachments/<id>/
    ```
 3. Do the work in the item's repo under `dev/`, using best-practice agentic
-   workflows: implement, test, commit — delegated to an implementer (and,
+   workflows: implement, test, commit, push — delegated to an implementer (and,
    for medium/high effort, a reviewer) sub-agent per section 3. **Work on
    the `main` branch by default** — commit directly to `main` unless the
    item's thread or the repo itself (a CONTRIBUTING doc, branch-protection,

@@ -22,6 +22,14 @@ class DispatcherTests(unittest.TestCase):
             "provider": "codex", "model": "gpt-5.6-terra", "effort": "low",
             "reasonCodes": ["small-change"], "confidence": "high",
         }
+        self.clean_postflight = lambda _: {
+            "endingBranch": "main",
+            "endingRevision": "abc123",
+            "newCommitCount": 0,
+            "dirty": False,
+            "upstream": "origin/main",
+            "unpushedCommitCount": 0,
+        }
 
     def test_lifecycle_order_and_normalized_result(self):
         events = []
@@ -31,6 +39,7 @@ class DispatcherTests(unittest.TestCase):
             load_item=lambda _: self.item,
             load_repo=lambda _: {"path": "ignored"},
             preflight=lambda _: {"path": "/repo", "branch": "main", "usesWorktree": False},
+            postflight=self.clean_postflight,
             create_run=lambda *a, **k: events.append("record-and-claim") or "run-1",
             post_event=lambda *a, **k: events.append("event") or "event-1",
             finalize=lambda *a: events.append("finalize"),
@@ -67,6 +76,7 @@ class DispatcherTests(unittest.TestCase):
             preflight=lambda _: {
                 "path": "/repo", "branch": "main", "usesWorktree": False
             },
+            postflight=self.clean_postflight,
             materialize_attachments=lambda item_id, loaded: materialized,
             create_run=lambda *a, **k: "run-1",
             post_event=lambda *a, **k: "event",
@@ -116,6 +126,55 @@ class DispatcherTests(unittest.TestCase):
         self.assertEqual("master", checkout["branch"])
         self.assertEqual("existing-checkout-default-branch", checkout["gitPolicy"])
 
+    @mock.patch("devloop.dispatcher.subprocess.run")
+    def test_postflight_records_commit_and_push_evidence(self, run):
+        run.side_effect = [
+            mock.Mock(returncode=0, stdout="main\n", stderr=""),
+            mock.Mock(returncode=0, stdout="def456\n", stderr=""),
+            mock.Mock(returncode=0, stdout="", stderr=""),
+            mock.Mock(returncode=0, stdout="1\n", stderr=""),
+            mock.Mock(returncode=0, stdout="origin/main\n", stderr=""),
+            mock.Mock(returncode=0, stdout="0\n", stderr=""),
+        ]
+        evidence = dispatcher.checkout_postflight({
+            "path": "/repo", "startingRevision": "abc123",
+        })
+        self.assertEqual(1, evidence["newCommitCount"])
+        self.assertEqual("main", evidence["endingBranch"])
+        self.assertEqual("origin/main", evidence["upstream"])
+        self.assertEqual(0, evidence["unpushedCommitCount"])
+
+    def test_incomplete_git_delivery_cannot_finalize_as_success(self):
+        finalized = []
+        adapter = FakeAdapter(WorkerResult(
+            outcome="succeeded",
+            summary="Implemented the change.",
+            files_changed=["README.md"],
+        ))
+        _, result = dispatcher.start(
+            "item-1", self.decision, adapter,
+            load_item=lambda _: self.item,
+            load_repo=lambda _: {"path": "ignored"},
+            preflight=lambda _: {
+                "path": "/repo", "branch": "main", "usesWorktree": False,
+                "startingRevision": "abc123",
+            },
+            postflight=lambda _: {
+                "endingBranch": "main", "endingRevision": "abc123",
+                "newCommitCount": 0,
+                "dirty": True, "upstream": "origin/main",
+                "unpushedCommitCount": 0,
+            },
+            create_run=lambda *a, **k: "run-1",
+            post_event=lambda *a, **k: "event",
+            finalize=lambda *args: finalized.append(args),
+        )
+        self.assertEqual("needs-review", result.outcome)
+        self.assertIn("uncommitted changes", result.summary)
+        self.assertIn("no new commit", result.summary)
+        self.assertTrue(result.metadata["gitPostflight"]["dirty"])
+        self.assertEqual(1, len(finalized))
+
     def test_worker_exception_becomes_normalized_failure(self):
         adapter = mock.Mock()
         adapter.run.side_effect = RuntimeError("boom")
@@ -125,6 +184,7 @@ class DispatcherTests(unittest.TestCase):
             load_item=lambda _: self.item,
             load_repo=lambda _: {"path": "ignored"},
             preflight=lambda _: {"path": "/repo", "branch": "main", "usesWorktree": False},
+            postflight=self.clean_postflight,
             create_run=lambda *a, **k: "run-1",
             post_event=lambda *a, **k: "event", finalize=lambda *a: finalized.append(a),
         )

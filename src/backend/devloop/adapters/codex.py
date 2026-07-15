@@ -59,6 +59,9 @@ class CodexAdapter:
                 "Implement and verify the requested work.",
                 "Use main and the existing checkout by default.",
                 "Do not create a worktree or branch unless instructions require it.",
+                "Commit all verified repository changes before returning.",
+                "Push the commit to the configured upstream and report any "
+                "push failure.",
                 "Work only on the requested repository task.",
                 "Inspect the provided local attachment paths when relevant.",
                 "Do not access dev-loop board credentials or call its board CLI.",

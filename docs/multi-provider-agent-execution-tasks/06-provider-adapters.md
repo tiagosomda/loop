@@ -23,7 +23,8 @@ Status: completed
 - Provider JSONL is retained in a trusted per-run directory, including partial
   timeout output, and the provider thread ID is recorded when available.
 - Worker prompts explicitly prohibit board credentials, board mutation, and
-  lifecycle ownership.
+  lifecycle ownership, and require verified changes to be committed and pushed
+  before the worker returns.
 - The trusted dispatcher downloads board attachments before claim; image paths
   are passed to Codex with `--image`, while credentials remain outside the
   worker prompt and repository.

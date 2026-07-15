@@ -54,6 +54,85 @@ def checkout_preflight(repo_dir: Path) -> dict[str, Any]:
     }
 
 
+def checkout_postflight(checkout: dict[str, Any]) -> dict[str, Any]:
+    """Collect independent Git evidence after an implementation worker exits."""
+    repo_dir = Path(checkout["path"])
+    starting_revision = checkout.get("startingRevision")
+    if not starting_revision:
+        raise DispatchError("checkout is missing its starting revision")
+
+    def git(*args: str, required: bool = True) -> str:
+        result = subprocess.run(
+            ["git", *args], cwd=repo_dir, text=True, capture_output=True
+        )
+        if result.returncode and required:
+            raise DispatchError(result.stderr.strip() or "git command failed")
+        return result.stdout.strip() if result.returncode == 0 else ""
+
+    branch = git("branch", "--show-current")
+    revision = git("rev-parse", "HEAD")
+    dirty = bool(git("status", "--porcelain"))
+    commit_count = int(git("rev-list", "--count", f"{starting_revision}..HEAD"))
+    upstream = git(
+        "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}",
+        required=False,
+    )
+    unpushed_count = (
+        int(git("rev-list", "--count", "@{upstream}..HEAD"))
+        if upstream else None
+    )
+    return {
+        "endingBranch": branch,
+        "endingRevision": revision,
+        "newCommitCount": commit_count,
+        "dirty": dirty,
+        "upstream": upstream or None,
+        "unpushedCommitCount": unpushed_count,
+    }
+
+
+def enforce_git_delivery(
+    result: WorkerResult, evidence: dict[str, Any]
+) -> WorkerResult:
+    """Turn incomplete Git delivery into an explicit human-review result."""
+    result.metadata["gitPostflight"] = evidence
+    has_repository_work = bool(
+        result.files_changed
+        or evidence.get("dirty")
+        or evidence.get("newCommitCount", 0)
+    )
+    if not has_repository_work:
+        return result
+
+    issues = []
+    if evidence.get("endingBranch") != evidence.get("expectedBranch"):
+        issues.append(
+            f"the checkout moved to branch {evidence.get('endingBranch')!r}"
+        )
+    if evidence.get("dirty"):
+        issues.append("the checkout still has uncommitted changes")
+    if result.files_changed and not evidence.get("newCommitCount", 0):
+        issues.append("no new commit records the reported file changes")
+    if evidence.get("newCommitCount", 0):
+        if not evidence.get("upstream"):
+            issues.append("the branch has no configured upstream")
+        elif evidence.get("unpushedCommitCount"):
+            issues.append(
+                f"{evidence['unpushedCommitCount']} commit(s) remain unpushed"
+            )
+    if not issues:
+        return result
+
+    return WorkerResult(
+        outcome="needs-review",
+        summary=f"{result.summary} Git delivery incomplete: {'; '.join(issues)}.",
+        files_changed=result.files_changed,
+        verification=result.verification,
+        provider_reference=result.provider_reference,
+        metadata=result.metadata,
+    )
+
+
 def materialize_item_attachments(
     item_id: str, item: dict[str, Any]
 ) -> list[dict[str, Any]]:
@@ -86,6 +165,9 @@ def start(item_id: str, decision: dict[str, Any], adapter: ProviderAdapter, *,
           post_event: Callable[..., str] = runs.post_routing_event,
           finalize: Callable[..., None] | None = None,
           preflight: Callable[[Path], dict[str, Any]] = checkout_preflight,
+          postflight: Callable[
+              [dict[str, Any]], dict[str, Any]
+          ] = checkout_postflight,
           materialize_attachments: Callable[
               [str, dict[str, Any]], list[dict[str, Any]]
           ] = materialize_item_attachments,
@@ -150,14 +232,32 @@ def start(item_id: str, decision: dict[str, Any], adapter: ProviderAdapter, *,
         "repository": checkout,
         "assignment": decision,
         "gitInstructions": (
-            "Use the existing checkout and main branch by default. Do not create "
-            "a worktree or branch unless repository or item instructions require it."
+            "Use the existing checkout and default branch. Do not create a "
+            "worktree or branch unless repository or item instructions require "
+            "it. Commit verified repository changes and push the resulting "
+            "commit to the configured upstream before returning."
         ),
     }
     try:
         result = adapter.run(task)
     except Exception as exc:
         result = WorkerResult(outcome="failed", summary=f"Worker failed: {exc}")
+    try:
+        evidence = postflight(checkout)
+        evidence["expectedBranch"] = checkout.get("branch")
+        result = enforce_git_delivery(result, evidence)
+    except Exception as exc:
+        result = WorkerResult(
+            outcome="needs-review",
+            summary=(
+                f"{result.summary} Git delivery could not be verified: "
+                f"{type(exc).__name__}: {exc}."
+            ),
+            files_changed=result.files_changed,
+            verification=result.verification,
+            provider_reference=result.provider_reference,
+            metadata=result.metadata,
+        )
     (finalize or _finalize)(item_id, run_id, result)
     return run_id, result
 

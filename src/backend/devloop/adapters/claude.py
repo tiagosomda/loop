@@ -35,6 +35,9 @@ class ClaudeAdapter:
                 "Do not access dev-loop credentials or board APIs.",
                 "Do not change board lifecycle or statuses.",
                 "Work only in the requested repository.",
+                "Commit all verified repository changes before returning.",
+                "Push the commit to the configured upstream and report any "
+                "push failure.",
             ],
         })
         try:

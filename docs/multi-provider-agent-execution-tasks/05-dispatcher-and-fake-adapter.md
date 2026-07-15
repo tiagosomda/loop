@@ -26,5 +26,9 @@ Status: completed
   accepted, while dirty or arbitrary feature branches are rejected before
   claim or worker execution.
 - Worker exceptions become normalized failed results and still finalize.
+- Postflight Git evidence independently checks for a clean checkout, a new
+  commit when files were reported, a configured upstream, and zero unpushed
+  commits. Incomplete delivery is surfaced as `needs-review` rather than a
+  false success.
 - Write-back failures are recorded on the durable run instead of erasing the
   worker outcome, and the backend contract suite passes.
