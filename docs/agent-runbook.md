@@ -141,11 +141,13 @@ for their own sake.
    $PY $CLI items post <id> --text "..." --attach path/to/file.png
    ```
 5. Set the final status (this also logs `item <id> -> <status>`):
-   - `needs-review` — user input or review is required (default for code
-     changes),
-   - `completed` — done and verified, nothing for the user to decide.
+   - `completed` — the requested work is done and you are confident in it
+     after proportionate verification. This is the default for finished code
+     changes; optional human review does not make the work incomplete.
+   - `needs-review` — a specific user decision or action is required before
+     the request can be considered complete.
    ```bash
-   $PY $CLI items status <id> needs-review
+   $PY $CLI items status <id> completed
    ```
    Never set `closed` — closing is the user's call.
 

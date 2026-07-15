@@ -75,6 +75,8 @@ class CodexAdapterTests(unittest.TestCase):
         self.assertIn('"role": "implementation-worker"', run.call_args.kwargs["input"])
         self.assertIn("Do not access dev-loop board credentials", run.call_args.kwargs["input"])
         prompt = run.call_args.kwargs["input"]
+        self.assertIn("Return `succeeded` when the requested work is complete", prompt)
+        self.assertIn("Do not use it merely to invite optional review", prompt)
         self.assertIn("Commit all verified repository changes", prompt)
         self.assertIn("Push the commit to the configured upstream", prompt)
 

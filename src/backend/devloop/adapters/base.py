@@ -4,6 +4,25 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 
+COMPLETION_POLICY = [
+    (
+        "Return `succeeded` when the requested work is complete and you are "
+        "confident in it after proportionate verification. This tells the "
+        "dispatcher to mark the action item completed."
+    ),
+    (
+        "Return `needs-review` only when a specific user decision or action is "
+        "required before the request can be considered complete. Do not use it "
+        "merely to invite optional review of completed work."
+    ),
+    (
+        "Before returning `succeeded`, commit and push any repository changes. "
+        "Report unavailable verification honestly, but do not require perfect "
+        "certainty when the completed work is otherwise well supported."
+    ),
+]
+
+
 @dataclass
 class WorkerResult:
     outcome: str

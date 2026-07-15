@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .. import config
-from .base import WorkerResult
+from .base import COMPLETION_POLICY, WorkerResult
 
 
 class CodexAdapter:
@@ -57,6 +57,7 @@ class CodexAdapter:
             "requirements": [
                 "Follow repository instructions.",
                 "Implement and verify the requested work.",
+                *COMPLETION_POLICY,
                 "Use main and the existing checkout by default.",
                 "Do not create a worktree or branch unless instructions require it.",
                 "Commit all verified repository changes before returning.",

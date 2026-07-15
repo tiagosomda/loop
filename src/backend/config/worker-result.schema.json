@@ -12,6 +12,7 @@
   ],
   "properties": {
     "outcome": {
+      "description": "Use succeeded when the requested work is complete and confidently verified. Use needs-review only when a specific user decision or action is required before completion; optional review of finished work is still succeeded.",
       "enum": ["succeeded", "needs-review", "failed", "timed-out", "cancelled"]
     },
     "summary": {"type": "string"},

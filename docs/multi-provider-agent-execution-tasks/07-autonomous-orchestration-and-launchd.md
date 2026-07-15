@@ -31,6 +31,9 @@ Status: completed
 - A worker `succeeded` outcome now completes the item after Git postflight has
   confirmed any repository changes are committed and pushed. Only an explicit
   `needs-review` result (including incomplete Git delivery) uses that status.
+- Provider prompts and the structured-result schema define `succeeded` as the
+  normal outcome for complete, confidently verified work. `needs-review` is
+  reserved for a concrete user decision or action, not optional review.
 - Run-end logging now occurs even when bootstrap fails. Completion publishes
   safe router/provider health and outcome state for the frontend.
 - Backend tests cover idle, bootstrap failure, failure-finally, stale queue

@@ -42,7 +42,10 @@ class ClaudeAdapterContractTests(unittest.TestCase):
         result = ClaudeAdapter().run(task())
         self.assertEqual("succeeded", result.outcome)
         self.assertEqual("session-1", result.provider_reference)
-        self.assertIn("Do not access dev-loop credentials", run.call_args.kwargs["input"])
+        prompt = run.call_args.kwargs["input"]
+        self.assertIn("Do not access dev-loop credentials", prompt)
+        self.assertIn("Return `succeeded` when the requested work is complete", prompt)
+        self.assertIn("Do not use it merely to invite optional review", prompt)
 
     @mock.patch("devloop.adapters.claude.subprocess.run")
     def test_timeout_is_normalized(self, run):
