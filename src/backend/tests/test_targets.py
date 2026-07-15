@@ -27,6 +27,12 @@ class TargetCatalogTests(unittest.TestCase):
             codex["models"],
         )
         self.assertEqual("GPT-5.6 Sol", codex["modelLabels"]["gpt-5.6-sol"])
+        self.assertEqual({
+            "targetId": "codex-standard",
+            "provider": "codex",
+            "model": "gpt-5.6-sol",
+            "effort": "high",
+        }, catalog["fallbackAssignment"])
 
     def test_duplicate_target_is_rejected(self):
         catalog = targets.load()
@@ -44,6 +50,12 @@ class TargetCatalogTests(unittest.TestCase):
         catalog = targets.load()
         catalog["targets"][1]["modelLabels"]["invented"] = "Invented"
         with self.assertRaisesRegex(targets.CatalogError, "invalid modelLabels"):
+            targets.load(self._catalog_file(catalog))
+
+    def test_fallback_must_match_an_enabled_worker(self):
+        catalog = targets.load()
+        catalog["fallbackAssignment"]["model"] = "invented"
+        with self.assertRaisesRegex(targets.CatalogError, "fallbackAssignment model"):
             targets.load(self._catalog_file(catalog))
 
     @mock.patch("devloop.targets.subprocess.run")

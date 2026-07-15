@@ -25,6 +25,12 @@ Status: completed
   work is not permanently blocked; it is never silently rerouted.
 - Added separate llama-server supervision and calendar orchestrator
   LaunchAgents for the six configured machine-local times.
+- Router confidence abstentions use the catalog's deterministic Codex
+  `gpt-5.6-sol`/high fallback when that target remains available and compatible
+  with explicit routing constraints. Otherwise the item is paused for review.
+- A worker `succeeded` outcome now completes the item after Git postflight has
+  confirmed any repository changes are committed and pushed. Only an explicit
+  `needs-review` result (including incomplete Git delivery) uses that status.
 - Run-end logging now occurs even when bootstrap fails. Completion publishes
   safe router/provider health and outcome state for the frontend.
 - Backend tests cover idle, bootstrap failure, failure-finally, stale queue

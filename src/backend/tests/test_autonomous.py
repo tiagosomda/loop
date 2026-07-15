@@ -109,16 +109,16 @@ class AutonomousTests(unittest.TestCase):
         self.assertEqual(2, result["count"])
         self.assertEqual("open", result["processed"][1]["itemId"])
 
-    def test_router_abstention_pauses_item_and_queue_continues(self):
+    def test_router_abstention_uses_configured_fallback_and_queue_continues(self):
         queue = [
             {"id": "uncertain", "status": "open"},
             {"id": "clear", "status": "open"},
             None,
         ]
-        paused = []
+        dispatched = []
 
         def choose(context):
-            if context["itemId"] == "uncertain":
+            if context["item"]["id"] == "uncertain":
                 raise router.RoutingError(
                     "needs-human-routing: router confidence is too low"
                 )
@@ -128,24 +128,62 @@ class AutonomousTests(unittest.TestCase):
             start_run=lambda: None,
             next_item=lambda: queue.pop(0),
             end_run=lambda **_kwargs: None,
-            build_context=lambda item_id: {"itemId": item_id},
+            build_context=lambda item_id: {
+                "item": {"id": item_id},
+                "requested": {"provider": None, "model": None, "effort": None},
+                "allowedTargets": [{
+                    "targetId": "codex-standard",
+                    "adapter": "codex",
+                    "models": ["gpt-5.6-sol"],
+                    "effortLevels": ["high"],
+                }],
+            },
             choose=choose,
-            pause_routing=lambda item, reason: paused.append(
-                (item["id"], reason)
-            ) or {"itemId": item["id"], "outcome": "needs-human-routing"},
             load_catalog=lambda: {
-                "targets": [{"targetId": "codex-standard", "enabled": True}]
+                "fallbackAssignment": {
+                    "targetId": "codex-standard", "provider": "codex",
+                    "model": "gpt-5.6-sol", "effort": "high",
+                },
+                "targets": [{"targetId": "codex-standard", "enabled": True}],
             },
             adapter_factory=lambda _: object(),
-            dispatch=lambda *a, **k: (
-                "run-clear", WorkerResult(outcome="succeeded", summary="done")
+            dispatch=lambda _item_id, decision, *_args, **_kwargs: (
+                dispatched.append(decision) or "run",
+                WorkerResult(outcome="succeeded", summary="done"),
             ),
             lock=no_lock,
         )
-        self.assertEqual("uncertain", paused[0][0])
-        self.assertIn("confidence", paused[0][1])
         self.assertEqual(2, result["count"])
+        self.assertEqual("gpt-5.6-sol", dispatched[0]["model"])
+        self.assertEqual("high", dispatched[0]["effort"])
         self.assertEqual("clear", result["processed"][1]["itemId"])
+
+    def test_router_abstention_pauses_when_fallback_is_not_allowed(self):
+        paused = []
+        result = autonomous.execute(
+            start_run=lambda: None,
+            next_item=iter([{"id": "item-1", "status": "open"}, None]).__next__,
+            end_run=lambda **_kwargs: None,
+            build_context=lambda item_id: {
+                "item": {"id": item_id}, "allowedTargets": [],
+            },
+            choose=lambda _: (_ for _ in ()).throw(router.RoutingError(
+                "needs-human-routing: no enabled available worker target"
+            )),
+            pause_routing=lambda item, reason: paused.append(reason) or {
+                "itemId": item["id"], "outcome": "needs-human-routing",
+            },
+            load_catalog=lambda: {
+                "fallbackAssignment": {
+                    "targetId": "codex-standard", "provider": "codex",
+                    "model": "gpt-5.6-sol", "effort": "high",
+                },
+                "targets": [],
+            },
+            lock=no_lock,
+        )
+        self.assertEqual(1, result["count"])
+        self.assertIn("no enabled", paused[0])
 
     def test_overlapping_lock_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

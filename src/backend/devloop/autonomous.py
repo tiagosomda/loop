@@ -58,6 +58,9 @@ def execute(*, start_run: Callable[[], Any] = run.start,
             end_run: Callable[..., str] = run.end,
             build_context: Callable[[str], dict[str, Any]] = router.build_context,
             choose: Callable[[dict[str, Any]], dict[str, Any]] = router.decide,
+            choose_fallback: Callable[
+                [dict[str, Any], dict[str, Any]], dict[str, Any] | None
+            ] = router.fallback_decision,
             dispatch: Callable[..., Any] = dispatcher.start,
             load_catalog: Callable[[], dict[str, Any]] = targets.load,
             adapter_factory: Callable[[dict[str, Any]], Any] = for_target,
@@ -82,15 +85,19 @@ def execute(*, start_run: Callable[[], Any] = run.start,
                     processed.append(recover(item))
                     continue
                 context = build_context(item["id"])
+                catalog = None
                 try:
                     decision = choose(context)
                 except router.RoutingError as exc:
                     reason = str(exc)
                     if not reason.startswith("needs-human-routing:"):
                         raise
-                    processed.append(pause_routing(item, reason))
-                    continue
-                catalog = load_catalog()
+                    catalog = load_catalog()
+                    decision = choose_fallback(context, catalog)
+                    if decision is None:
+                        processed.append(pause_routing(item, reason))
+                        continue
+                catalog = catalog or load_catalog()
                 selected = next(
                     (target for target in catalog["targets"]
                      if target["targetId"] == decision["targetId"]),

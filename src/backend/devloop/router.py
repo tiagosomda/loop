@@ -131,6 +131,41 @@ def decide(context: dict[str, Any], timeout: float = 60.0) -> dict[str, Any]:
     return decision
 
 
+def fallback_decision(
+    context: dict[str, Any], catalog: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Resolve the configured default when the classifier safely abstains."""
+    fallback = catalog.get("fallbackAssignment")
+    if not fallback:
+        return None
+    allowed = {
+        target["targetId"]: target for target in context.get("allowedTargets", [])
+    }
+    target = allowed.get(fallback["targetId"])
+    if target is None:
+        # Availability and explicit user routing constraints remain hard limits.
+        return None
+    if (fallback["provider"] != target["adapter"] or
+            fallback["model"] not in target["models"] or
+            fallback["effort"] not in target["effortLevels"]):
+        return None
+    requested = context.get("requested") or {}
+    if any(
+        requested.get(key) is not None and requested[key] != fallback[key]
+        for key in ("provider", "model", "effort")
+    ):
+        return None
+    decision = {
+        "schemaVersion": 1,
+        "itemId": context["item"]["id"],
+        **fallback,
+        "reasonCodes": ["router-abstained", "configured-fallback"],
+        "confidence": "high",
+    }
+    validate_decision(context, decision)
+    return decision
+
+
 def validate_decision(context: dict[str, Any], decision: Any) -> None:
     if not isinstance(decision, dict):
         raise RoutingError("router decision must be an object")

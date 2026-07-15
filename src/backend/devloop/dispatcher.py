@@ -276,7 +276,12 @@ def _finalize(item_id: str, run_id: str, result: WorkerResult) -> None:
         "updatedAt": firestore.SERVER_TIMESTAMP,
         "finishedAt": firestore.SERVER_TIMESTAMP,
     })
-    status = "needs-review" if result.outcome in {"succeeded", "needs-review"} else "in-progress"
+    if result.outcome == "succeeded":
+        status = "completed"
+    elif result.outcome == "needs-review":
+        status = "needs-review"
+    else:
+        status = "in-progress"
     batch.update(item_ref, {"status": status, "updatedAt": firestore.SERVER_TIMESTAMP})
     batch.commit()
     items.runlog.log(f"item {item_id} -> {status}")

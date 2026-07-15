@@ -67,6 +67,35 @@ class RouterTests(unittest.TestCase):
         with self.assertRaisesRegex(router.RoutingError, "needs-human-routing"):
             router.validate_decision(context(), value)
 
+    def test_configured_fallback_resolves_to_codex_sol_high(self):
+        value = context()
+        value["allowedTargets"][0]["models"] = ["gpt-5.6-sol"]
+        fallback = router.fallback_decision(value, {
+            "fallbackAssignment": {
+                "targetId": "codex-standard",
+                "provider": "codex",
+                "model": "gpt-5.6-sol",
+                "effort": "high",
+            },
+        })
+        self.assertEqual("codex-standard", fallback["targetId"])
+        self.assertEqual("gpt-5.6-sol", fallback["model"])
+        self.assertEqual("high", fallback["effort"])
+        self.assertIn("router-abstained", fallback["reasonCodes"])
+
+    def test_configured_fallback_does_not_override_request_constraints(self):
+        value = context()
+        value["allowedTargets"][0]["models"] = ["gpt-5.6-sol"]
+        value["requested"]["effort"] = "low"
+        self.assertIsNone(router.fallback_decision(value, {
+            "fallbackAssignment": {
+                "targetId": "codex-standard",
+                "provider": "codex",
+                "model": "gpt-5.6-sol",
+                "effort": "high",
+            },
+        }))
+
     def test_invalid_reason_code_is_rejected(self):
         value = decision()
         value["reasonCodes"] = ["private reasoning"]

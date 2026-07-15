@@ -216,8 +216,25 @@ class DispatcherTests(unittest.TestCase):
             ),
         )
         self.assertEqual(2, batch.update.call_count)
+        self.assertEqual("completed", batch.update.call_args_list[1].args[1]["status"])
         post_message.assert_called_once()
         item_collection.return_value.document.assert_called_with("item-1")
+
+    @mock.patch("devloop.dispatcher.items.post_message")
+    @mock.patch("devloop.dispatcher.items._items")
+    @mock.patch("devloop.dispatcher.items.fs.db")
+    @mock.patch("devloop.dispatcher.items.runlog.log")
+    def test_explicit_review_outcome_remains_needs_review(
+        self, _log, db, _item_collection, _post_message
+    ):
+        dispatcher._finalize(
+            "item-1", "run-1",
+            WorkerResult(outcome="needs-review", summary="review this"),
+        )
+        batch = db.return_value.batch.return_value
+        self.assertEqual(
+            "needs-review", batch.update.call_args_list[1].args[1]["status"]
+        )
 
 
 if __name__ == "__main__":

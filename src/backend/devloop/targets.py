@@ -84,6 +84,26 @@ def validate(catalog: dict[str, Any]) -> None:
         if not isinstance(target["concurrencyLimit"], int) or target["concurrencyLimit"] < 1:
             raise CatalogError(f"invalid concurrencyLimit for {target_id!r}")
 
+    fallback = catalog.get("fallbackAssignment")
+    if fallback is None:
+        return
+    required = {"targetId", "provider", "model", "effort"}
+    if not isinstance(fallback, dict) or set(fallback) != required:
+        raise CatalogError("fallbackAssignment has missing or unexpected fields")
+    target = next(
+        (candidate for candidate in targets
+         if candidate["targetId"] == fallback["targetId"]),
+        None,
+    )
+    if target is None or target["role"] != "worker" or not target["enabled"]:
+        raise CatalogError("fallbackAssignment target must be an enabled worker")
+    if fallback["provider"] != target["adapter"]:
+        raise CatalogError("fallbackAssignment provider does not match target")
+    if fallback["model"] not in target["models"]:
+        raise CatalogError("fallbackAssignment model is not allowed for target")
+    if fallback["effort"] not in target["effortLevels"]:
+        raise CatalogError("fallbackAssignment effort is not allowed for target")
+
 
 def _nonempty_strings(value: Any) -> bool:
     return (isinstance(value, list) and bool(value) and
