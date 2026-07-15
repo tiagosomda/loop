@@ -49,7 +49,9 @@ queries cheap:
 ### Scheduled agent loop
 
 - Runs roughly every 5 hours at **:15**, same times every day:
-  **00:15, 05:15, 10:15, 15:15, 20:15** (local).
+  **00:15, 01:30, 05:15, 10:15, 15:15, 20:15** in the configured
+  `America/New_York` scheduler timezone. Firestore also receives upcoming UTC
+  instants so the frontend can display them in the viewer's local timezone.
 - Procedure per run (see `docs/agent-runbook.md`):
   1. Pull items with status `open` or `in-progress`.
   2. For stale `in-progress` items: check how old the claim is and whether
@@ -80,7 +82,7 @@ dev-loop/app/repos/{repoId}                    crawled repos
     name, path, remote, host ("github"|"gitlab"),
     status ("active"|"removed"), lastSeenAt
 dev-loop/app/meta/schedule                     agent schedule info
-    times: ["00:15", ...], lastRunAt, updatedAt
+    times: ["00:15", ...], timezone, nextRunsAt, lastRunAt, updatedAt
 ```
 
 Attachments are stored in Firebase Storage under
@@ -200,7 +202,7 @@ follow-system themes. Lean on Material 3 + established packages
    attachments, new-item flow, profile, logged-out landing.
 5. **Deploy** — GitHub Pages workflow (`--base-href /loop/`).
 6. **Agent loop** — `docs/agent-runbook.md` + Claude Code scheduled task at
-   00:15/05:15/10:15/15:15/20:15; `schedule update` + `repos crawl` run at
+   00:15/01:30/05:15/10:15/15:15/20:15; `schedule update` + `repos crawl` run at
    the end of setup and periodically thereafter.
 7. **Later / nice-to-have** — thumbnails for image attachments, item
    labels/priorities, notifications when items hit `needs-review`, board

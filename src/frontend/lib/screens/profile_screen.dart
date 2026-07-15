@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
@@ -15,6 +16,9 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   String _repoSearch = '';
+
+  String _scheduleLabel(DateTime run) =>
+      DateFormat('EEE M/d, h:mm a').format(run.toLocal());
 
   @override
   Widget build(BuildContext context) {
@@ -78,6 +82,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               if (schedule == null || schedule.times.isEmpty) {
                 return const Text('No schedule published yet.');
               }
+              final nextRuns = schedule.nextRunsAt.take(6).toList();
               return Card(
                 margin: EdgeInsets.zero,
                 child: Padding(
@@ -89,14 +94,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          for (final t in schedule.times)
+                          for (final label
+                              in nextRuns.isEmpty
+                                  ? schedule.times
+                                  : nextRuns.map(_scheduleLabel))
                             Chip(
                               avatar: const Icon(Icons.alarm, size: 14),
-                              label: Text(t),
+                              label: Text(label),
                             ),
                         ],
                       ),
                       const SizedBox(height: 8),
+                      Text(
+                        nextRuns.isEmpty
+                            ? 'scheduler times · ${schedule.timezone}'
+                            : 'next runs in your local time · scheduled in ${schedule.timezone}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
                       Text(
                         'managed by ${schedule.scheduler} · router: '
                         '${schedule.routerAvailable ? 'online' : schedule.routerReason ?? 'unknown'}',

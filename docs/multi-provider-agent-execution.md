@@ -151,8 +151,8 @@ judgments inside explicit contracts.
 ## Scheduler recommendation
 
 Use the operating system scheduler as the wake-up mechanism. On this machine,
-`launchd` runs the provider-neutral autonomous command at the five configured
-local times. A separate always-on LaunchAgent supervises llama-server.
+`launchd` runs the provider-neutral autonomous command at the six configured
+machine-local times. A separate always-on LaunchAgent supervises llama-server.
 
 Neither Codex nor Claude schedules own orchestration. Codex is invoked only as
 a worker selected by the local router, so provider selection and queue

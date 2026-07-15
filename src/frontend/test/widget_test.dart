@@ -6,6 +6,7 @@ import 'package:dev_loop/services/board_service.dart';
 import 'package:dev_loop/screens/new_item_sheet.dart';
 import 'package:dev_loop/widgets/attachment_gallery.dart';
 import 'package:dev_loop/widgets/brand_logo.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -222,6 +223,8 @@ void main() {
   test('schedule health is parsed from data-driven provider state', () {
     final schedule = ScheduleInfo.fromMap({
       'times': ['00:15'],
+      'timezone': 'America/New_York',
+      'nextRunsAt': [Timestamp.fromDate(DateTime.utc(2026, 7, 15, 4, 15))],
       'scheduler': 'launchd',
       'routerHealth': {'available': true, 'reason': 'healthy'},
       'providers': [
@@ -243,6 +246,17 @@ void main() {
       ],
     });
     expect(schedule.scheduler, 'launchd');
+    expect(schedule.timezone, 'America/New_York');
+    expect(
+      schedule.nextRunsAt.single.toUtc(),
+      DateTime.utc(2026, 7, 15, 4, 15),
+    );
+    final localRun = DateTime.utc(2026, 7, 15, 4, 15).toLocal();
+    expect(
+      schedule.viewerLocalTimes.single,
+      '${localRun.hour.toString().padLeft(2, '0')}:'
+      '${localRun.minute.toString().padLeft(2, '0')}',
+    );
     expect(schedule.routerAvailable, isTrue);
     expect(schedule.providers.map((provider) => provider.adapter), [
       'codex',

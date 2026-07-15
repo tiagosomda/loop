@@ -24,7 +24,7 @@ Status: completed
   preserved, surfaced for review, and moved to `needs-review` so later open
   work is not permanently blocked; it is never silently rerouted.
 - Added separate llama-server supervision and calendar orchestrator
-  LaunchAgents for the five configured local times.
+  LaunchAgents for the six configured machine-local times.
 - Run-end logging now occurs even when bootstrap fails. Completion publishes
   safe router/provider health and outcome state for the frontend.
 - Backend tests cover idle, bootstrap failure, failure-finally, stale queue

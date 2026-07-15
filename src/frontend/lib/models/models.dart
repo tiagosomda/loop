@@ -358,6 +358,8 @@ class RepoInfo {
 
 class ScheduleInfo {
   final List<String> times;
+  final String timezone;
+  final List<DateTime> nextRunsAt;
   final DateTime? lastRunAt;
   final DateTime? lastFinishedAt;
   final DateTime? updatedAt;
@@ -370,6 +372,8 @@ class ScheduleInfo {
 
   ScheduleInfo({
     required this.times,
+    this.timezone = 'local',
+    this.nextRunsAt = const [],
     this.lastRunAt,
     this.lastFinishedAt,
     this.updatedAt,
@@ -383,6 +387,10 @@ class ScheduleInfo {
 
   factory ScheduleInfo.fromMap(Map<String, dynamic>? d) => ScheduleInfo(
     times: [for (final t in (d?['times'] as List? ?? [])) t.toString()],
+    timezone: d?['timezone'] ?? 'local',
+    nextRunsAt: [
+      for (final value in (d?['nextRunsAt'] as List? ?? [])) ?_ts(value),
+    ],
     lastRunAt: _ts(d?['lastRunAt']),
     lastFinishedAt: _ts(d?['lastFinishedAt']),
     updatedAt: _ts(d?['updatedAt']),
@@ -396,6 +404,15 @@ class ScheduleInfo {
         ProviderHealth.fromMap(Map<String, dynamic>.from(provider)),
     ],
   );
+
+  List<String> get viewerLocalTimes {
+    if (nextRunsAt.isEmpty) return times;
+    return {
+      for (final run in nextRunsAt)
+        '${run.toLocal().hour.toString().padLeft(2, '0')}:'
+            '${run.toLocal().minute.toString().padLeft(2, '0')}',
+    }.toList();
+  }
 }
 
 class ProviderHealth {

@@ -1,7 +1,7 @@
 # dev-loop agent runbook
 
-Procedure for the scheduled agent run (00:15 / 05:15 / 10:15 / 15:15 / 20:15
-local). Only one agent runs at a time.
+Procedure for the scheduled agent run (00:15 / 01:30 / 05:15 / 10:15 / 15:15
+/ 20:15 machine-local). Only one agent runs at a time.
 
 All board commands run from `src/backend` in the dev-loop repo:
 

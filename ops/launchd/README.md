@@ -5,8 +5,10 @@ schedules:
 
 - `com.devloop.llama-server` keeps the local Gemma router available on
   `127.0.0.1:8080` and restarts it after a crash.
-- `com.devloop.orchestrator` runs `devloop run autonomous` at 00:15, 05:15,
-  10:15, 15:15, and 20:15 local time.
+- `com.devloop.orchestrator` runs `devloop run autonomous` at 00:15, 01:30,
+  05:15, 10:15, 15:15, and 20:15 machine-local time. The published schedule
+  interprets these slots in `DEV_LOOP_SCHEDULE_TIMEZONE` (default:
+  `America/New_York`) and exposes upcoming UTC instants for viewer-local UI.
 
 ## Prerequisites
 

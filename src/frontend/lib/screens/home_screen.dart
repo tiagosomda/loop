@@ -24,8 +24,9 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: StreamBuilder<ScheduleInfo>(
           stream: board.schedule(),
-          builder: (context, snapshot) =>
-              BrandTitle(scheduleTimes: snapshot.data?.times ?? const []),
+          builder: (context, snapshot) => BrandTitle(
+            scheduleTimes: snapshot.data?.viewerLocalTimes ?? const [],
+          ),
         ),
         actions: [
           const ThemeToggleButton(),
