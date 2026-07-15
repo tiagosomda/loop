@@ -20,17 +20,26 @@ def checkout_preflight(repo_dir: Path) -> dict[str, Any]:
     if not repo_dir.is_dir():
         raise DispatchError(f"repository path does not exist: {repo_dir}")
 
-    def git(*args: str) -> str:
+    def git(*args: str, required: bool = True) -> str:
         result = subprocess.run(["git", *args], cwd=repo_dir, text=True,
                                 capture_output=True)
-        if result.returncode:
+        if result.returncode and required:
             raise DispatchError(result.stderr.strip() or "git command failed")
-        return result.stdout.strip()
+        return result.stdout.strip() if result.returncode == 0 else ""
 
     branch = git("branch", "--show-current")
+    remote_default = "main"
     if branch != "main":
+        remote_head = git(
+            "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD",
+            required=False,
+        )
+        if remote_head.startswith("origin/"):
+            remote_default = remote_head.removeprefix("origin/")
+    if branch != remote_default:
         raise DispatchError(
-            f"repository is on {branch!r}, not main; refusing unattended dispatch"
+            f"repository is on {branch!r}, not its default branch "
+            f"{remote_default!r}; refusing unattended dispatch"
         )
     revision = git("rev-parse", "HEAD")
     dirty = git("status", "--porcelain")
@@ -41,7 +50,7 @@ def checkout_preflight(repo_dir: Path) -> dict[str, Any]:
         "branch": branch,
         "startingRevision": revision,
         "usesWorktree": False,
-        "gitPolicy": "existing-checkout-main-by-default",
+        "gitPolicy": "existing-checkout-default-branch",
     }
 
 

@@ -61,10 +61,26 @@ class DispatcherTests(unittest.TestCase):
 
     @mock.patch("devloop.dispatcher.subprocess.run")
     def test_non_main_checkout_is_rejected(self, run):
-        run.return_value = mock.Mock(returncode=0, stdout="feature\n", stderr="")
+        run.side_effect = [
+            mock.Mock(returncode=0, stdout="feature\n", stderr=""),
+            mock.Mock(returncode=0, stdout="origin/main\n", stderr=""),
+        ]
         with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(dispatcher.DispatchError, "not main"):
+            with self.assertRaisesRegex(dispatcher.DispatchError, "default branch"):
                 dispatcher.checkout_preflight(Path(directory))
+
+    @mock.patch("devloop.dispatcher.subprocess.run")
+    def test_remote_default_master_checkout_is_allowed(self, run):
+        run.side_effect = [
+            mock.Mock(returncode=0, stdout="master\n", stderr=""),
+            mock.Mock(returncode=0, stdout="origin/master\n", stderr=""),
+            mock.Mock(returncode=0, stdout="abc123\n", stderr=""),
+            mock.Mock(returncode=0, stdout="", stderr=""),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            checkout = dispatcher.checkout_preflight(Path(directory))
+        self.assertEqual("master", checkout["branch"])
+        self.assertEqual("existing-checkout-default-branch", checkout["gitPolicy"])
 
     def test_worker_exception_becomes_normalized_failure(self):
         adapter = mock.Mock()

@@ -21,8 +21,10 @@ Status: completed
 - Added deterministic dispatch ordering: Git preflight, atomic eligibility
   recheck plus run/claim transaction, routing event, adapter invocation, and
   durable finalization.
-- The clean existing `main` checkout is used with no worktree; dirty or
-  non-main repositories are rejected before claim or worker execution.
+- The clean existing default-branch checkout is used with no worktree. `main`
+  is the fallback; repositories whose remote default remains `master` are
+  accepted, while dirty or arbitrary feature branches are rejected before
+  claim or worker execution.
 - Worker exceptions become normalized failed results and still finalize.
 - Write-back failures are recorded on the durable run instead of erasing the
   worker outcome, and the backend contract suite passes.
