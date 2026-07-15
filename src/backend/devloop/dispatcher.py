@@ -54,6 +54,31 @@ def checkout_preflight(repo_dir: Path) -> dict[str, Any]:
     }
 
 
+def materialize_item_attachments(
+    item_id: str, item: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Download board attachments through the trusted Firebase boundary."""
+    metadata = [
+        attachment
+        for message in item.get("messages", [])
+        for attachment in message.get("attachments", [])
+    ]
+    if not metadata:
+        return []
+    paths = items.fetch_attachments(item_id)
+    if len(paths) != len(metadata):
+        raise DispatchError("downloaded attachment count does not match item metadata")
+    return [
+        {
+            "name": attachment.get("name"),
+            "contentType": attachment.get("contentType"),
+            "size": attachment.get("size"),
+            "path": path,
+        }
+        for attachment, path in zip(metadata, paths)
+    ]
+
+
 def start(item_id: str, decision: dict[str, Any], adapter: ProviderAdapter, *,
           load_item: Callable[[str], dict[str, Any]] = items.show_item,
           load_repo: Callable[[str], dict[str, Any] | None] = repos.get,
@@ -61,6 +86,9 @@ def start(item_id: str, decision: dict[str, Any], adapter: ProviderAdapter, *,
           post_event: Callable[..., str] = runs.post_routing_event,
           finalize: Callable[..., None] | None = None,
           preflight: Callable[[Path], dict[str, Any]] = checkout_preflight,
+          materialize_attachments: Callable[
+              [str, dict[str, Any]], list[dict[str, Any]]
+          ] = materialize_item_attachments,
           catalog: dict[str, Any] | None = None) -> tuple[str, WorkerResult]:
     item = load_item(item_id)
     if item.get("status") != "open":
@@ -97,6 +125,7 @@ def start(item_id: str, decision: dict[str, Any], adapter: ProviderAdapter, *,
     if not repo:
         raise DispatchError(f"repository {item.get('repoId')!r} not found")
     checkout = preflight((config.DEV_ROOT / repo["path"]).resolve())
+    attachments = materialize_attachments(item_id, item)
 
     try:
         run_id = create_run(
@@ -117,6 +146,7 @@ def start(item_id: str, decision: dict[str, Any], adapter: ProviderAdapter, *,
         "runId": run_id,
         "title": item.get("title"),
         "request": item.get("messages", []),
+        "attachments": attachments,
         "repository": checkout,
         "assignment": decision,
         "gitInstructions": (

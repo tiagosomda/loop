@@ -15,6 +15,7 @@ def task():
         "runId": "run1",
         "repository": {"path": "/repo", "branch": "main", "usesWorktree": False},
         "assignment": {"model": "default", "effort": "high"},
+        "attachments": [],
     }
 
 
@@ -27,6 +28,20 @@ class CodexAdapterTests(unittest.TestCase):
         self.assertIn('model_reasoning_effort="high"', command)
         self.assertEqual("-", command[-1])
         self.assertNotIn("--model", command)
+
+    def test_image_attachment_is_passed_to_codex(self):
+        image_task = {
+            **task(),
+            "attachments": [{
+                "path": "/tmp/reference.jpeg",
+                "contentType": "application/octet-stream",
+            }],
+        }
+        command = CodexAdapter().command(image_task, Path("/tmp/result.json"))
+        self.assertEqual(
+            "/tmp/reference.jpeg",
+            command[command.index("--image") + 1],
+        )
 
     @mock.patch("devloop.adapters.codex.subprocess.run")
     def test_success_parses_normalized_result_and_keeps_provider_events(self, run):

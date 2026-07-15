@@ -40,6 +40,40 @@ class DispatcherTests(unittest.TestCase):
         self.assertEqual("succeeded", result.outcome)
         self.assertFalse(adapter.tasks[0]["repository"]["usesWorktree"])
 
+    def test_attachments_are_materialized_before_worker_invocation(self):
+        item = {
+            **self.item,
+            "messages": [{
+                "author": "user",
+                "text": "Match this screenshot",
+                "attachments": [{
+                    "name": "reference.jpeg",
+                    "contentType": "application/octet-stream",
+                    "size": 10,
+                }],
+            }],
+        }
+        adapter = FakeAdapter()
+        materialized = [{
+            "name": "reference.jpeg",
+            "contentType": "application/octet-stream",
+            "size": 10,
+            "path": "/trusted/reference.jpeg",
+        }]
+        dispatcher.start(
+            "item-1", self.decision, adapter,
+            load_item=lambda _: item,
+            load_repo=lambda _: {"path": "ignored"},
+            preflight=lambda _: {
+                "path": "/repo", "branch": "main", "usesWorktree": False
+            },
+            materialize_attachments=lambda item_id, loaded: materialized,
+            create_run=lambda *a, **k: "run-1",
+            post_event=lambda *a, **k: "event",
+            finalize=lambda *a: None,
+        )
+        self.assertEqual(materialized, adapter.tasks[0]["attachments"])
+
     def test_ineligible_item_stops_before_assignment(self):
         create_run = mock.Mock()
         item = {**self.item, "status": "in-progress"}

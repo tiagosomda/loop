@@ -24,6 +24,9 @@ Status: completed
   timeout output, and the provider thread ID is recorded when available.
 - Worker prompts explicitly prohibit board credentials, board mutation, and
   lifecycle ownership.
+- The trusted dispatcher downloads board attachments before claim; image paths
+  are passed to Codex with `--image`, while credentials remain outside the
+  worker prompt and repository.
 - Full access is hardcoded with
   `--dangerously-bypass-approvals-and-sandbox` inside the trusted adapter.
 - Added a Claude Code adapter boundary while keeping `claude-standard`

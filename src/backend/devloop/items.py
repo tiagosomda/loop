@@ -336,7 +336,10 @@ def fetch_attachments(item_id: str, new_only: bool = False,
     paths: list[str] = []
     for msg in messages:
         for att in msg.get("attachments") or []:
-            target = base / msg["id"] / att["name"]
+            name = Path(str(att.get("name", ""))).name
+            if not name or name in {".", ".."}:
+                raise ValueError("attachment has an invalid local file name")
+            target = base / msg["id"] / name
             target.parent.mkdir(parents=True, exist_ok=True)
             bucket.blob(att["storagePath"]).download_to_filename(str(target))
             paths.append(str(target))

@@ -32,6 +32,14 @@ class CodexAdapter:
         effort = assignment.get("effort")
         if effort:
             command.extend(["--config", f'model_reasoning_effort="{effort}"'])
+        for attachment in task.get("attachments", []):
+            path = attachment.get("path")
+            content_type = attachment.get("contentType") or ""
+            suffix = Path(path).suffix.lower() if isinstance(path, str) else ""
+            if (isinstance(path, str) and
+                    (content_type.startswith("image/") or
+                     suffix in {".png", ".jpg", ".jpeg", ".gif", ".webp"})):
+                command.extend(["--image", path])
         command.append("-")
         return command
 
@@ -52,6 +60,7 @@ class CodexAdapter:
                 "Use main and the existing checkout by default.",
                 "Do not create a worktree or branch unless instructions require it.",
                 "Work only on the requested repository task.",
+                "Inspect the provided local attachment paths when relevant.",
                 "Do not access dev-loop board credentials or call its board CLI.",
                 "Do not change board items, messages, routing, or statuses.",
                 "Do not mark anything closed; lifecycle is owned by the dispatcher.",
