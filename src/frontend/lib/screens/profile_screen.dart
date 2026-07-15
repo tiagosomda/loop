@@ -68,6 +68,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 24),
           Text(
+            'SETTINGS',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              letterSpacing: 1.5,
+              color: scheme.primary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.brightness_6_outlined),
+                  const SizedBox(width: 12),
+                  const Expanded(child: Text('Appearance')),
+                  DropdownButton<ThemeMode>(
+                    value: app.themeMode,
+                    underline: const SizedBox.shrink(),
+                    onChanged: (mode) {
+                      if (mode != null) app.setThemeMode(mode);
+                    },
+                    items: const [
+                      DropdownMenuItem(
+                        value: ThemeMode.system,
+                        child: Text('System'),
+                      ),
+                      DropdownMenuItem(
+                        value: ThemeMode.light,
+                        child: Text('Light'),
+                      ),
+                      DropdownMenuItem(
+                        value: ThemeMode.dark,
+                        child: Text('Dark'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
             'LOCAL AUTOMATION',
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
               letterSpacing: 1.5,

@@ -40,23 +40,3 @@ class DevLoopApp extends StatelessWidget {
     );
   }
 }
-
-/// Theme cycle button used on every header (system -> dark -> light).
-class ThemeToggleButton extends StatelessWidget {
-  const ThemeToggleButton({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final app = context.watch<AppState>();
-    final icon = switch (app.themeMode) {
-      ThemeMode.system => Icons.brightness_auto,
-      ThemeMode.dark => Icons.dark_mode,
-      ThemeMode.light => Icons.light_mode,
-    };
-    return IconButton(
-      tooltip: 'Theme: ${app.themeMode.name}',
-      icon: Icon(icon),
-      onPressed: app.cycleTheme,
-    );
-  }
-}

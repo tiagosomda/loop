@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../main.dart';
 import '../models/models.dart';
 import '../services/board_service.dart';
 import '../state/app_state.dart';
@@ -29,7 +28,6 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
         actions: [
-          const ThemeToggleButton(),
           IconButton(
             tooltip: 'Profile',
             icon: const Icon(Icons.person_outline),

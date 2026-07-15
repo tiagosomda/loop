@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../main.dart';
 import '../state/app_state.dart';
 import '../widgets/brand_logo.dart';
 
@@ -19,7 +18,6 @@ class LoggedOutScreen extends StatelessWidget {
         centerTitle: true,
         title: const BrandTitle(showLogo: false),
         actions: [
-          const ThemeToggleButton(),
           IconButton(
             tooltip: wrongAccount ? 'Sign out' : 'Sign in',
             icon: Icon(wrongAccount ? Icons.logout : Icons.login),

@@ -51,9 +51,9 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> cycleTheme() async {
-    const order = [ThemeMode.system, ThemeMode.dark, ThemeMode.light];
-    themeMode = order[(order.indexOf(themeMode) + 1) % order.length];
+  Future<void> setThemeMode(ThemeMode mode) async {
+    if (themeMode == mode) return;
+    themeMode = mode;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('themeMode', themeMode.name);
