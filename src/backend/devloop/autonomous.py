@@ -33,15 +33,24 @@ def single_instance(path: Path | None = None):
 def pause_for_recovery(item: dict[str, Any]) -> dict[str, Any]:
     """Surface stale evidence and unblock later open items without rerouting."""
     evidence = run.check_stale(item["id"])
-    items.post_message(
+    items.pause_for_review(
         item["id"],
         "Autonomous recovery paused this prior run for review. No new provider "
         "was selected and existing repository work was left untouched.\n\n"
         f"Recovery evidence: {evidence}",
-        author="agent",
     )
-    items.set_status(item["id"], "needs-review")
     return {"itemId": item["id"], "outcome": "needs-human-recovery"}
+
+
+def pause_for_routing(item: dict[str, Any], reason: str) -> dict[str, Any]:
+    """Surface a safe router abstention without retrying it every schedule."""
+    items.pause_for_review(
+        item["id"],
+        "Automatic routing paused this item for review. No worker was launched "
+        "and the repository was not changed.\n\n"
+        f"Reason: {reason}",
+    )
+    return {"itemId": item["id"], "outcome": "needs-human-routing"}
 
 
 def execute(*, start_run: Callable[[], Any] = run.start,
@@ -53,6 +62,7 @@ def execute(*, start_run: Callable[[], Any] = run.start,
             load_catalog: Callable[[], dict[str, Any]] = targets.load,
             adapter_factory: Callable[[dict[str, Any]], Any] = for_target,
             recover: Callable[[dict[str, Any]], dict[str, Any]] = pause_for_recovery,
+            pause_routing: Callable[[dict[str, Any], str], dict[str, Any]] = pause_for_routing,
             lock: Callable[[], Any] = single_instance,
             max_items: int | None = None) -> dict[str, Any]:
     processed: list[dict[str, Any]] = []
@@ -72,7 +82,14 @@ def execute(*, start_run: Callable[[], Any] = run.start,
                     processed.append(recover(item))
                     continue
                 context = build_context(item["id"])
-                decision = choose(context)
+                try:
+                    decision = choose(context)
+                except router.RoutingError as exc:
+                    reason = str(exc)
+                    if not reason.startswith("needs-human-routing:"):
+                        raise
+                    processed.append(pause_routing(item, reason))
+                    continue
                 catalog = load_catalog()
                 selected = next(
                     (target for target in catalog["targets"]

@@ -43,6 +43,21 @@ class ItemRoutingRequestTests(unittest.TestCase):
         self.assertIsNone(payload["requestedModel"])
         self.assertEqual("high", payload["requestedEffort"])
 
+    @mock.patch("devloop.items.runlog.log")
+    @mock.patch("devloop.items.fs.db")
+    @mock.patch("devloop.items._items")
+    def test_pause_for_review_commits_message_and_status_together(
+        self, item_collection, db, log
+    ):
+        batch = db.return_value.batch.return_value
+        items.pause_for_review("item-1", "Routing needs review")
+        batch.set.assert_called_once()
+        batch.update.assert_called_once()
+        self.assertEqual("needs-review", batch.update.call_args.args[1]["status"])
+        batch.commit.assert_called_once()
+        log.assert_called_once_with("item item-1 -> needs-review")
+        item_collection.return_value.document.assert_called_once_with("item-1")
+
 
 if __name__ == "__main__":
     unittest.main()

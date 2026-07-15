@@ -5,7 +5,7 @@ import unittest
 from contextlib import contextmanager
 from pathlib import Path
 
-from devloop import autonomous
+from devloop import autonomous, router
 from devloop.adapters.base import WorkerResult
 
 
@@ -108,6 +108,44 @@ class AutonomousTests(unittest.TestCase):
         self.assertEqual(["stale"], recovered)
         self.assertEqual(2, result["count"])
         self.assertEqual("open", result["processed"][1]["itemId"])
+
+    def test_router_abstention_pauses_item_and_queue_continues(self):
+        queue = [
+            {"id": "uncertain", "status": "open"},
+            {"id": "clear", "status": "open"},
+            None,
+        ]
+        paused = []
+
+        def choose(context):
+            if context["itemId"] == "uncertain":
+                raise router.RoutingError(
+                    "needs-human-routing: router confidence is too low"
+                )
+            return {"targetId": "codex-standard"}
+
+        result = autonomous.execute(
+            start_run=lambda: None,
+            next_item=lambda: queue.pop(0),
+            end_run=lambda **_kwargs: None,
+            build_context=lambda item_id: {"itemId": item_id},
+            choose=choose,
+            pause_routing=lambda item, reason: paused.append(
+                (item["id"], reason)
+            ) or {"itemId": item["id"], "outcome": "needs-human-routing"},
+            load_catalog=lambda: {
+                "targets": [{"targetId": "codex-standard", "enabled": True}]
+            },
+            adapter_factory=lambda _: object(),
+            dispatch=lambda *a, **k: (
+                "run-clear", WorkerResult(outcome="succeeded", summary="done")
+            ),
+            lock=no_lock,
+        )
+        self.assertEqual("uncertain", paused[0][0])
+        self.assertIn("confidence", paused[0][1])
+        self.assertEqual(2, result["count"])
+        self.assertEqual("clear", result["processed"][1]["itemId"])
 
     def test_overlapping_lock_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

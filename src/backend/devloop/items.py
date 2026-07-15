@@ -264,6 +264,28 @@ def post_message(item_id: str, text: str, author: str = "agent",
     return msg_id
 
 
+def pause_for_review(item_id: str, text: str) -> str:
+    """Atomically add an agent explanation and move an item to review."""
+    item_ref = _items().document(item_id)
+    msg_id = uuid.uuid4().hex[:20]
+    message_ref = item_ref.collection("messages").document(msg_id)
+    batch = fs.db().batch()
+    batch.set(message_ref, {
+        "author": "agent",
+        "text": text,
+        "attachments": [],
+        "createdAt": firestore.SERVER_TIMESTAMP,
+    })
+    batch.update(item_ref, {
+        "status": "needs-review",
+        "messageCount": firestore.firestore.Increment(1),
+        "updatedAt": firestore.SERVER_TIMESTAMP,
+    })
+    batch.commit()
+    runlog.log(f"item {item_id} -> needs-review")
+    return msg_id
+
+
 def _thread(doc) -> list[dict]:
     return [
         {"id": m.id, **{k: _iso(v) for k, v in (m.to_dict() or {}).items()}}
