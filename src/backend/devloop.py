@@ -126,6 +126,7 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("autonomous", help="route and dispatch the queue locally")
     p.add_argument("--max-items", type=int,
                    help="optional bounded item count for manual rollout checks")
+    sub.add_parser("self-healing", help="inspect prior runs and repair scheduler errors")
 
     # targets
     targets = top.add_parser("targets", help="safe provider target catalog")
@@ -220,6 +221,9 @@ def main(argv: list[str] | None = None) -> None:
                 _print(autonomous.execute(max_items=args.max_items))
             except autonomous.AlreadyRunning as exc:
                 _print({"alreadyRunning": True, "message": str(exc)})
+        elif args.cmd == "self-healing":
+            from devloop import self_healing
+            _print(self_healing.execute())
     elif args.group == "runlog":
         from devloop import runlog as mod
         if args.cmd == "add":

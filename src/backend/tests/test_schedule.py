@@ -18,6 +18,13 @@ class ScheduleTests(unittest.TestCase):
         )
         self.assertEqual(config.SCHEDULE_TIMES, actual)
 
+    def test_self_healing_launchd_calendar_matches_published_schedule(self):
+        plist_path = config.REPO_ROOT / "ops/launchd/com.devloop.self-healing.plist"
+        launchd = plistlib.loads(plist_path.read_bytes())
+        entry = launchd["StartCalendarInterval"]
+        actual = (f"{entry['Hour']:02d}:{entry['Minute']:02d}",)
+        self.assertEqual(config.SELF_HEALING_SCHEDULE_TIMES, actual)
+
     def test_upcoming_runs_are_utc_instants_from_scheduler_timezone(self):
         now = datetime(2026, 7, 15, 4, 0, tzinfo=timezone.utc)
         actual = schedule.upcoming_runs(now=now, count=3)
@@ -35,6 +42,15 @@ class ScheduleTests(unittest.TestCase):
             actual[3],
         )
 
+    def test_upcoming_sessions_include_typed_self_healing_run(self):
+        now = datetime(2026, 7, 15, 11, 0, tzinfo=timezone.utc)
+        sessions = schedule.upcoming_sessions(now=now, count=3)
+        self.assertEqual("self-healing", sessions[0]["kind"])
+        self.assertEqual(
+            datetime(2026, 7, 15, 12, 15, tzinfo=timezone.utc),
+            sessions[0]["startsAt"],
+        )
+
     @mock.patch("devloop.schedule.upcoming_runs")
     @mock.patch("devloop.schedule.fs.db")
     def test_update_publishes_timezone_and_concrete_next_runs(self, db, upcoming):
@@ -45,6 +61,10 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(config.SCHEDULE_TIMEZONE, payload["timezone"])
         self.assertEqual([next_run], payload["nextRunsAt"])
         self.assertEqual([next_run.isoformat()], result["nextRunsAt"])
+        self.assertIn("nextSessions", payload)
+        self.assertIn(
+            {"kind": "self-healing", "time": "08:15"}, payload["sessions"]
+        )
 
     @mock.patch("devloop.targets.safe_projection")
     @mock.patch("devloop.schedule.fs.db")

@@ -18,7 +18,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _repoSearch = '';
 
   String _scheduleLabel(DateTime run) =>
-      DateFormat('EEE M/d, h:mm a').format(run.toLocal());
+      DateFormat('h:mm a').format(run.toLocal());
+
+  List<ScheduledSession> _sortedSessionTimes(List<ScheduledSession> sessions) {
+    final unique = <String, ScheduledSession>{};
+    for (final session in sessions) {
+      final local = session.startsAt.toLocal();
+      final key = '${session.kind}:${local.hour}:${local.minute}';
+      unique.putIfAbsent(key, () => session);
+    }
+    return unique.values.toList()..sort((a, b) {
+      final aLocal = a.startsAt.toLocal();
+      final bLocal = b.startsAt.toLocal();
+      return (aLocal.hour * 60 + aLocal.minute).compareTo(
+        bLocal.hour * 60 + bLocal.minute,
+      );
+    });
+  }
+
+  bool _isNextSession(ScheduledSession session, ScheduledSession? nextSession) {
+    if (nextSession == null || session.kind != nextSession.kind) return false;
+    final local = session.startsAt.toLocal();
+    final nextLocal = nextSession.startsAt.toLocal();
+    return local.hour == nextLocal.hour && local.minute == nextLocal.minute;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -125,7 +148,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
               if (schedule == null || schedule.times.isEmpty) {
                 return const Text('No schedule published yet.');
               }
-              final nextRuns = schedule.nextRunsAt.take(6).toList();
+              final nextSession = schedule.nextSessions.isEmpty
+                  ? null
+                  : schedule.nextSessions.first;
+              final sessionTimes = _sortedSessionTimes(schedule.nextSessions);
+              final nextRun = schedule.nextRunsAt.isEmpty
+                  ? null
+                  : schedule.nextRunsAt.first;
+              final runTimes =
+                  schedule.nextRunsAt
+                      .map((run) => run.toLocal())
+                      .fold(<String, DateTime>{}, (unique, run) {
+                        unique.putIfAbsent(
+                          '${run.hour}:${run.minute}',
+                          () => run,
+                        );
+                        return unique;
+                      })
+                      .values
+                      .toList()
+                    ..sort(
+                      (a, b) => (a.hour * 60 + a.minute).compareTo(
+                        b.hour * 60 + b.minute,
+                      ),
+                    );
               return Card(
                 margin: EdgeInsets.zero,
                 child: Padding(
@@ -137,21 +183,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          for (final label
-                              in nextRuns.isEmpty
-                                  ? schedule.times
-                                  : nextRuns.map(_scheduleLabel))
-                            Chip(
-                              avatar: const Icon(Icons.alarm, size: 14),
-                              label: Text(label),
-                            ),
+                          if (sessionTimes.isNotEmpty)
+                            for (final session in sessionTimes)
+                              Tooltip(
+                                message:
+                                    '${_isNextSession(session, nextSession) ? 'Next · ' : ''}'
+                                    '${session.isSelfHealing ? 'Self-healing session' : 'Dev-loop session'}',
+                                child: Chip(
+                                  backgroundColor:
+                                      _isNextSession(session, nextSession)
+                                      ? scheme.primaryContainer
+                                      : null,
+                                  avatar: Icon(
+                                    session.isSelfHealing
+                                        ? Icons.healing
+                                        : Icons.alarm,
+                                    size: 14,
+                                  ),
+                                  label: Text(
+                                    _scheduleLabel(session.startsAt),
+                                    style: _isNextSession(session, nextSession)
+                                        ? const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                          )
+                                        : null,
+                                  ),
+                                ),
+                              )
+                          else
+                            for (final label
+                                in runTimes.isEmpty
+                                    ? (schedule.times.toList()..sort())
+                                    : runTimes.map(_scheduleLabel))
+                              Chip(
+                                avatar: const Icon(Icons.alarm, size: 14),
+                                label: Text(
+                                  label,
+                                  style:
+                                      nextRun != null &&
+                                          label == _scheduleLabel(nextRun)
+                                      ? const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        )
+                                      : null,
+                                ),
+                                backgroundColor:
+                                    nextRun != null &&
+                                        label == _scheduleLabel(nextRun)
+                                    ? scheme.primaryContainer
+                                    : null,
+                              ),
                         ],
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        nextRuns.isEmpty
+                        runTimes.isEmpty && sessionTimes.isEmpty
                             ? 'scheduler times · ${schedule.timezone}'
-                            : 'next runs in your local time · scheduled in ${schedule.timezone}',
+                            : 'local times · scheduled in ${schedule.timezone}',
                         style: TextStyle(
                           fontSize: 12,
                           color: scheme.onSurface.withValues(alpha: 0.6),

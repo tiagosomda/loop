@@ -19,7 +19,7 @@ class AutonomousTests(unittest.TestCase):
         events = []
         result = autonomous.execute(
             start_run=lambda: events.append("start"),
-            next_item=lambda: None,
+            next_item=lambda _blocked: None,
             end_run=lambda **_kwargs: events.append("end"),
             lock=no_lock,
         )
@@ -31,7 +31,7 @@ class AutonomousTests(unittest.TestCase):
         events = []
         result = autonomous.execute(
             start_run=lambda: events.append("start"),
-            next_item=lambda: queue.pop(0),
+            next_item=lambda _blocked: queue.pop(0),
             end_run=lambda **_kwargs: events.append("end"),
             build_context=lambda _: {"context": True},
             choose=lambda _: {"targetId": "codex-standard"},
@@ -47,23 +47,45 @@ class AutonomousTests(unittest.TestCase):
         self.assertEqual(1, result["count"])
         self.assertEqual(["start", "end"], events)
 
-    def test_failure_still_ends_run(self):
+    def test_failure_blocks_only_its_repo_and_run_continues(self):
         events = []
         finished = []
-        with self.assertRaisesRegex(RuntimeError, "router down"):
-            autonomous.execute(
-                start_run=lambda: events.append("start"),
-                next_item=lambda: {"id": "item-1", "status": "open"},
-                end_run=lambda **kwargs: (
-                    events.append("end"), finished.append(kwargs)
-                ),
-                build_context=lambda _: {},
-                choose=lambda _: (_ for _ in ()).throw(RuntimeError("router down")),
-                lock=no_lock,
-            )
+        items = [
+            {"id": "item-1", "status": "open", "repoId": "repo-a"},
+            {"id": "item-2", "status": "open", "repoId": "repo-a"},
+            {"id": "item-3", "status": "open", "repoId": "repo-b"},
+        ]
+
+        def next_item(blocked):
+            return next((item for item in items if item["repoId"] not in blocked), None)
+
+        def context(item_id):
+            items[:] = [item for item in items if item["id"] != item_id]
+            if item_id == "item-1":
+                raise RuntimeError("router down")
+            return {}
+
+        result = autonomous.execute(
+            start_run=lambda: events.append("start"),
+            next_item=next_item,
+            end_run=lambda **kwargs: (
+                events.append("end"), finished.append(kwargs)
+            ),
+            build_context=context,
+            choose=lambda _: {"targetId": "codex-standard"},
+            load_catalog=lambda: {
+                "targets": [{"targetId": "codex-standard", "enabled": True}]
+            },
+            adapter_factory=lambda _: object(),
+            dispatch=lambda *a, **k: (
+                "run-3", WorkerResult(outcome="succeeded", summary="done")
+            ),
+            lock=no_lock,
+        )
         self.assertEqual(["start", "end"], events)
-        self.assertEqual("failed", finished[0]["outcome"])
-        self.assertIn("router down", finished[0]["note"])
+        self.assertIn("repository work skipped", finished[0]["note"])
+        self.assertIn("repo-a", result["blockedRepositories"])
+        self.assertEqual(["item-1", "item-3"], [p["itemId"] for p in result["processed"]])
 
     def test_bootstrap_failure_still_ends_run(self):
         events = []
@@ -89,7 +111,7 @@ class AutonomousTests(unittest.TestCase):
         recovered = []
         result = autonomous.execute(
             start_run=lambda: None,
-            next_item=lambda: queue.pop(0),
+            next_item=lambda _blocked: queue.pop(0),
             end_run=lambda **_kwargs: None,
             recover=lambda item: recovered.append(item["id"]) or {
                 "itemId": item["id"], "outcome": "needs-human-recovery"
@@ -126,7 +148,7 @@ class AutonomousTests(unittest.TestCase):
 
         result = autonomous.execute(
             start_run=lambda: None,
-            next_item=lambda: queue.pop(0),
+            next_item=lambda _blocked: queue.pop(0),
             end_run=lambda **_kwargs: None,
             build_context=lambda item_id: {
                 "item": {"id": item_id},
@@ -162,7 +184,9 @@ class AutonomousTests(unittest.TestCase):
         paused = []
         result = autonomous.execute(
             start_run=lambda: None,
-            next_item=iter([{"id": "item-1", "status": "open"}, None]).__next__,
+            next_item=lambda _blocked, iterator=iter([
+                {"id": "item-1", "status": "open"}, None
+            ]): next(iterator),
             end_run=lambda **_kwargs: None,
             build_context=lambda item_id: {
                 "item": {"id": item_id}, "allowedTargets": [],

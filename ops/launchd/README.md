@@ -6,9 +6,13 @@ schedules:
 - `com.devloop.llama-server` keeps the local Gemma router available on
   `127.0.0.1:8080` and restarts it after a crash.
 - `com.devloop.orchestrator` runs `devloop run autonomous` at 00:15, 01:30,
-  05:15, 10:15, 15:15, and 20:15 machine-local time. The published schedule
+  05:15, 10:15, 13:15, 15:15, 17:15, and 20:15 machine-local time. The published schedule
   interprets these slots in `DEV_LOOP_SCHEDULE_TIMEZONE` (default:
   `America/New_York`) and exposes upcoming UTC instants for viewer-local UI.
+- `com.devloop.self-healing` runs at 08:15 machine-local time. It inspects new
+  scheduler failures since its prior inspection, creates a diagnostic board
+  item when needed, attempts a safe repair, and always leaves that item in
+  `needs-review`. It never consumes the normal board queue.
 
 ## Prerequisites
 
@@ -28,11 +32,15 @@ install -m 644 ops/launchd/com.devloop.llama-server.plist \
   ~/Library/LaunchAgents/com.devloop.llama-server.plist
 install -m 644 ops/launchd/com.devloop.orchestrator.plist \
   ~/Library/LaunchAgents/com.devloop.orchestrator.plist
+install -m 644 ops/launchd/com.devloop.self-healing.plist \
+  ~/Library/LaunchAgents/com.devloop.self-healing.plist
 
 launchctl bootstrap gui/$(id -u) \
   ~/Library/LaunchAgents/com.devloop.llama-server.plist
 launchctl bootstrap gui/$(id -u) \
   ~/Library/LaunchAgents/com.devloop.orchestrator.plist
+launchctl bootstrap gui/$(id -u) \
+  ~/Library/LaunchAgents/com.devloop.self-healing.plist
 ```
 
 Use `launchctl kickstart -k gui/$(id -u)/com.devloop.llama-server` or the

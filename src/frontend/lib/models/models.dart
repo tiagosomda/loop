@@ -360,6 +360,7 @@ class ScheduleInfo {
   final List<String> times;
   final String timezone;
   final List<DateTime> nextRunsAt;
+  final List<ScheduledSession> nextSessions;
   final DateTime? lastRunAt;
   final DateTime? lastFinishedAt;
   final DateTime? updatedAt;
@@ -374,6 +375,7 @@ class ScheduleInfo {
     required this.times,
     this.timezone = 'local',
     this.nextRunsAt = const [],
+    this.nextSessions = const [],
     this.lastRunAt,
     this.lastFinishedAt,
     this.updatedAt,
@@ -390,6 +392,10 @@ class ScheduleInfo {
     timezone: d?['timezone'] ?? 'local',
     nextRunsAt: [
       for (final value in (d?['nextRunsAt'] as List? ?? [])) ?_ts(value),
+    ],
+    nextSessions: [
+      for (final value in (d?['nextSessions'] as List? ?? []))
+        ScheduledSession.fromMap(Map<String, dynamic>.from(value as Map)),
     ],
     lastRunAt: _ts(d?['lastRunAt']),
     lastFinishedAt: _ts(d?['lastFinishedAt']),
@@ -413,6 +419,21 @@ class ScheduleInfo {
             '${run.toLocal().minute.toString().padLeft(2, '0')}',
     }.toList();
   }
+}
+
+class ScheduledSession {
+  final String kind;
+  final DateTime startsAt;
+
+  const ScheduledSession({required this.kind, required this.startsAt});
+
+  factory ScheduledSession.fromMap(Map<String, dynamic> map) =>
+      ScheduledSession(
+        kind: map['kind']?.toString() ?? 'dev-loop',
+        startsAt: _ts(map['startsAt'])!,
+      );
+
+  bool get isSelfHealing => kind == 'self-healing';
 }
 
 class ProviderHealth {

@@ -58,10 +58,12 @@ class CodexAdapter:
                 "Follow repository instructions.",
                 "Implement and verify the requested work.",
                 *COMPLETION_POLICY,
-                "Use main and the existing checkout by default.",
-                "Do not create a worktree or branch unless instructions require it.",
+                "Continue from the current branch and working tree.",
+                "Preserve existing commits and uncommitted work unless the task "
+                "explicitly requires changing them.",
+                "Do not create a worktree.",
                 "Commit all verified repository changes before returning.",
-                "Push the commit to the configured upstream and report any "
+                "Push commits when an upstream is configured and report any "
                 "push failure.",
                 "Work only on the requested repository task.",
                 "Inspect the provided local attachment paths when relevant.",

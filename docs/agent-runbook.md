@@ -1,7 +1,7 @@
 # dev-loop agent runbook
 
-Procedure for the scheduled agent run (00:15 / 01:30 / 05:15 / 10:15 / 15:15
-/ 20:15 machine-local). Only one agent runs at a time.
+Procedure for the scheduled agent run (00:15 / 01:30 / 05:15 / 10:15 / 13:15
+/ 15:15 / 17:15 / 20:15 machine-local). Only one agent runs at a time.
 
 All board commands run from `src/backend` in the dev-loop repo:
 
@@ -77,8 +77,8 @@ run itself harder to reason about. Split the actual work into two
 sub-agent roles instead:
 
 - **Implementer** — a fresh sub-agent scoped to exactly one item. Give it
-  the item's id/title, the thread text relevant to this run (all of it on
-  first contact, only the new messages on a reopened item), the repo's
+  the item's id/title, the complete thread so follow-up work retains the
+  original request and prior implementation context, the repo's
   local path, and the per-item rules from section 4 below (branch/commit
   convention, tests, build). It does the actual coding and reports back a
   short summary: what changed, where, how it verified the work, and
@@ -114,13 +114,11 @@ for their own sake.
    ```bash
    $PY $CLI items claim <id>
    ```
-2. Read the thread. First time on an item, read all of it; on a **reopened**
-   item (the thread contains your earlier `agent` messages), read only what's
-   new — the user messages after your last reply are the new request, and the
-   earlier exchange is background you don't need to redo:
+2. Read the complete thread, including earlier user requests and agent replies.
+   Reopened items often build on prior implementation decisions, so the new
+   request must be interpreted with that history intact:
    ```bash
-   $PY $CLI items show <id>          # full thread (first contact)
-   $PY $CLI items show <id> --new    # only messages since your last reply
+   $PY $CLI items show <id>          # complete thread
    ```
    Messages list attachments as metadata only (name/type/size). Download them
    **only when relevant to the work** — selectively, not wholesale:
@@ -130,10 +128,10 @@ for their own sake.
 3. Do the work in the item's repo under `dev/`, using best-practice agentic
    workflows: implement, test, commit, push — delegated to an implementer (and,
    for medium/high effort, a reviewer) sub-agent per section 3. **Work on
-   the `main` branch by default** — commit directly to `main` unless the
-   item's thread or the repo itself (a CONTRIBUTING doc, branch-protection,
-   an established branch/PR convention) calls for a feature branch. When
-   you do branch, open a PR if the repo has a remote workflow that fits.
+   the repository's current branch and working tree**, preserving existing
+   commits and uncommitted work unless the thread explicitly directs a branch
+   change. Do not create a worktree. Open a PR when the repository's workflow
+   calls for one.
 4. Write results back — always. Include what was done, where (branch/PR
    links), what's left, and anything the user must decide. Attach files or
    screenshots when they help:

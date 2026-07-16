@@ -333,6 +333,12 @@ void main() {
       'times': ['00:15'],
       'timezone': 'America/New_York',
       'nextRunsAt': [Timestamp.fromDate(DateTime.utc(2026, 7, 15, 4, 15))],
+      'nextSessions': [
+        {
+          'kind': 'self-healing',
+          'startsAt': Timestamp.fromDate(DateTime.utc(2026, 7, 15, 12, 15)),
+        },
+      ],
       'scheduler': 'launchd',
       'routerHealth': {'available': true, 'reason': 'healthy'},
       'providers': [
@@ -366,6 +372,7 @@ void main() {
       '${localRun.minute.toString().padLeft(2, '0')}',
     );
     expect(schedule.routerAvailable, isTrue);
+    expect(schedule.nextSessions.single.isSelfHealing, isTrue);
     expect(schedule.providers.map((provider) => provider.adapter), [
       'codex',
       'claude-code',

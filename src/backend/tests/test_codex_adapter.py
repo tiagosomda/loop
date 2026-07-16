@@ -78,7 +78,7 @@ class CodexAdapterTests(unittest.TestCase):
         self.assertIn("Return `succeeded` when the requested work is complete", prompt)
         self.assertIn("Do not use it merely to invite optional review", prompt)
         self.assertIn("Commit all verified repository changes", prompt)
-        self.assertIn("Push the commit to the configured upstream", prompt)
+        self.assertIn("Push commits when an upstream is configured", prompt)
 
     @mock.patch("devloop.adapters.codex.subprocess.run")
     def test_timeout_is_normalized(self, run):

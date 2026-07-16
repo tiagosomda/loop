@@ -93,38 +93,45 @@ class DispatcherTests(unittest.TestCase):
         create_run.assert_not_called()
 
     @mock.patch("devloop.dispatcher.subprocess.run")
-    def test_dirty_checkout_is_rejected(self, run):
+    def test_dirty_checkout_is_preserved_as_context(self, run):
         run.side_effect = [
             mock.Mock(returncode=0, stdout="main\n", stderr=""),
             mock.Mock(returncode=0, stdout="abc123\n", stderr=""),
             mock.Mock(returncode=0, stdout=" M user-file\n", stderr=""),
-        ]
-        with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(dispatcher.DispatchError, "uncommitted changes"):
-                dispatcher.checkout_preflight(Path(directory))
-
-    @mock.patch("devloop.dispatcher.subprocess.run")
-    def test_non_main_checkout_is_rejected(self, run):
-        run.side_effect = [
-            mock.Mock(returncode=0, stdout="feature\n", stderr=""),
-            mock.Mock(returncode=0, stdout="origin/main\n", stderr=""),
-        ]
-        with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(dispatcher.DispatchError, "default branch"):
-                dispatcher.checkout_preflight(Path(directory))
-
-    @mock.patch("devloop.dispatcher.subprocess.run")
-    def test_remote_default_master_checkout_is_allowed(self, run):
-        run.side_effect = [
-            mock.Mock(returncode=0, stdout="master\n", stderr=""),
-            mock.Mock(returncode=0, stdout="origin/master\n", stderr=""),
-            mock.Mock(returncode=0, stdout="abc123\n", stderr=""),
-            mock.Mock(returncode=0, stdout="", stderr=""),
+            mock.Mock(returncode=1, stdout="", stderr="no upstream"),
         ]
         with tempfile.TemporaryDirectory() as directory:
             checkout = dispatcher.checkout_preflight(Path(directory))
-        self.assertEqual("master", checkout["branch"])
-        self.assertEqual("existing-checkout-default-branch", checkout["gitPolicy"])
+        self.assertTrue(checkout["dirty"])
+        self.assertEqual(["M user-file"], checkout["status"])
+        self.assertIsNone(checkout["upstream"])
+
+    @mock.patch("devloop.dispatcher.subprocess.run")
+    def test_non_main_checkout_is_allowed(self, run):
+        run.side_effect = [
+            mock.Mock(returncode=0, stdout="feature\n", stderr=""),
+            mock.Mock(returncode=0, stdout="abc123\n", stderr=""),
+            mock.Mock(returncode=0, stdout="", stderr=""),
+            mock.Mock(returncode=1, stdout="", stderr="no upstream"),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            checkout = dispatcher.checkout_preflight(Path(directory))
+        self.assertEqual("feature", checkout["branch"])
+        self.assertEqual("persistent-repository-checkout", checkout["gitPolicy"])
+
+    @mock.patch("devloop.dispatcher.subprocess.run")
+    def test_upstream_and_unpushed_commits_are_recorded_not_rejected(self, run):
+        run.side_effect = [
+            mock.Mock(returncode=0, stdout="feature\n", stderr=""),
+            mock.Mock(returncode=0, stdout="abc123\n", stderr=""),
+            mock.Mock(returncode=0, stdout="", stderr=""),
+            mock.Mock(returncode=0, stdout="origin/feature\n", stderr=""),
+            mock.Mock(returncode=0, stdout="2\n", stderr=""),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            checkout = dispatcher.checkout_preflight(Path(directory))
+        self.assertEqual("origin/feature", checkout["upstream"])
+        self.assertEqual(2, checkout["unpushedCommitCount"])
 
     @mock.patch("devloop.dispatcher.subprocess.run")
     def test_postflight_records_commit_and_push_evidence(self, run):

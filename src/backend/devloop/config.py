@@ -25,7 +25,11 @@ ATTACHMENTS_PREFIX = "dev-loop/attachments"
 ITEM_STATUSES = ("open", "in-progress", "needs-review", "completed", "closed")
 
 # Local times the scheduled agent wakes up (see docs/design.md).
-SCHEDULE_TIMES = ("00:15", "01:30", "05:15", "10:15", "15:15", "20:15")
+SCHEDULE_TIMES = (
+    "00:15", "01:30", "05:15", "10:15", "13:15", "15:15", "17:15", "20:15",
+)
+SELF_HEALING_SCHEDULE_TIMES = ("08:15",)
+SELF_HEALING_REPO_ID = "tiagosomda__dev-loop"
 # IANA zone used by the machine running launchd. Override this if the scheduler
 # is moved to a machine in another zone; the frontend receives concrete UTC
 # instants and renders them in each viewer's local zone.

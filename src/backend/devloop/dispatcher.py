@@ -28,29 +28,28 @@ def checkout_preflight(repo_dir: Path) -> dict[str, Any]:
         return result.stdout.strip() if result.returncode == 0 else ""
 
     branch = git("branch", "--show-current")
-    remote_default = "main"
-    if branch != "main":
-        remote_head = git(
-            "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD",
-            required=False,
-        )
-        if remote_head.startswith("origin/"):
-            remote_default = remote_head.removeprefix("origin/")
-    if branch != remote_default:
-        raise DispatchError(
-            f"repository is on {branch!r}, not its default branch "
-            f"{remote_default!r}; refusing unattended dispatch"
-        )
+    if not branch:
+        raise DispatchError("repository has a detached HEAD; refusing unattended dispatch")
     revision = git("rev-parse", "HEAD")
     dirty = git("status", "--porcelain")
-    if dirty:
-        raise DispatchError("repository has uncommitted changes; refusing unattended dispatch")
+    upstream = git(
+        "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}",
+        required=False,
+    )
+    unpushed_count = (
+        int(git("rev-list", "--count", f"{upstream}..HEAD"))
+        if upstream else None
+    )
     return {
         "path": str(repo_dir.resolve()),
         "branch": branch,
         "startingRevision": revision,
+        "dirty": bool(dirty),
+        "status": dirty.splitlines(),
+        "upstream": upstream or None,
+        "unpushedCommitCount": unpushed_count,
         "usesWorktree": False,
-        "gitPolicy": "existing-checkout-default-branch",
+        "gitPolicy": "persistent-repository-checkout",
     }
 
 
@@ -232,10 +231,11 @@ def start(item_id: str, decision: dict[str, Any], adapter: ProviderAdapter, *,
         "repository": checkout,
         "assignment": decision,
         "gitInstructions": (
-            "Use the existing checkout and default branch. Do not create a "
-            "worktree or branch unless repository or item instructions require "
-            "it. Commit verified repository changes and push the resulting "
-            "commit to the configured upstream before returning."
+            "Continue from the existing persistent repository checkout. Preserve "
+            "and build upon its current branch, commits, and working-tree changes "
+            "unless the item thread explicitly requires otherwise. Do not create "
+            "a worktree. Commit verified repository changes and push when an "
+            "upstream is configured."
         ),
     }
     try:

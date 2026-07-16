@@ -54,7 +54,7 @@ def pause_for_routing(item: dict[str, Any], reason: str) -> dict[str, Any]:
 
 
 def execute(*, start_run: Callable[[], Any] = run.start,
-            next_item: Callable[[], dict[str, Any] | None] = run.next_item,
+            next_item: Callable[[set[str]], dict[str, Any] | None] = run.next_item,
             end_run: Callable[..., str] = run.end,
             build_context: Callable[[str], dict[str, Any]] = router.build_context,
             choose: Callable[[dict[str, Any]], dict[str, Any]] = router.decide,
@@ -69,6 +69,7 @@ def execute(*, start_run: Callable[[], Any] = run.start,
             lock: Callable[[], Any] = single_instance,
             max_items: int | None = None) -> dict[str, Any]:
     processed: list[dict[str, Any]] = []
+    blocked_repos: dict[str, str] = {}
     with lock():
         started = False
         failure: Exception | None = None
@@ -78,51 +79,79 @@ def execute(*, start_run: Callable[[], Any] = run.start,
             started = True
             start_run()
             while max_items is None or len(processed) < max_items:
-                item = next_item()
+                item = next_item(set(blocked_repos))
                 if item is None:
                     break
                 if item.get("status") == "in-progress":
-                    processed.append(recover(item))
+                    recovery = recover(item)
+                    processed.append(recovery)
+                    if item.get("repoId"):
+                        blocked_repos[item["repoId"]] = recovery["outcome"]
                     continue
-                context = build_context(item["id"])
-                catalog = None
                 try:
-                    decision = choose(context)
-                except router.RoutingError as exc:
-                    reason = str(exc)
-                    if not reason.startswith("needs-human-routing:"):
-                        raise
-                    catalog = load_catalog()
-                    decision = choose_fallback(context, catalog)
-                    if decision is None:
-                        processed.append(pause_routing(item, reason))
-                        continue
-                catalog = catalog or load_catalog()
-                selected = next(
-                    (target for target in catalog["targets"]
-                     if target["targetId"] == decision["targetId"]),
-                    None,
-                )
-                if selected is None or not selected["enabled"]:
-                    raise RuntimeError("router selected a missing or disabled target")
-                adapter = adapter_factory(selected)
-                run_id, result = dispatch(
-                    item["id"], decision, adapter, catalog=catalog
-                )
-                processed.append({
-                    "itemId": item["id"], "runId": run_id,
-                    "outcome": result.outcome,
-                })
+                    context = build_context(item["id"])
+                    catalog = None
+                    try:
+                        decision = choose(context)
+                    except router.RoutingError as exc:
+                        reason = str(exc)
+                        if not reason.startswith("needs-human-routing:"):
+                            raise
+                        catalog = load_catalog()
+                        decision = choose_fallback(context, catalog)
+                        if decision is None:
+                            processed.append(pause_routing(item, reason))
+                            if item.get("repoId"):
+                                blocked_repos[item["repoId"]] = reason
+                            continue
+                    catalog = catalog or load_catalog()
+                    selected = next(
+                        (target for target in catalog["targets"]
+                         if target["targetId"] == decision["targetId"]),
+                        None,
+                    )
+                    if selected is None or not selected["enabled"]:
+                        raise RuntimeError("router selected a missing or disabled target")
+                    adapter = adapter_factory(selected)
+                    run_id, result = dispatch(
+                        item["id"], decision, adapter, catalog=catalog
+                    )
+                    processed.append({
+                        "itemId": item["id"], "runId": run_id,
+                        "outcome": result.outcome,
+                    })
+                    if result.outcome in {"failed", "timed-out"}:
+                        blocked_repos[item["repoId"]] = result.summary
+                except Exception as exc:
+                    repo_id = item.get("repoId")
+                    processed.append({
+                        "itemId": item["id"],
+                        "outcome": "failed",
+                        "error": f"{type(exc).__name__}: {exc}",
+                    })
+                    if repo_id:
+                        blocked_repos[repo_id] = f"{type(exc).__name__}: {exc}"
         except Exception as exc:
             failure = exc
             raise
         finally:
             if started:
                 if failure is None:
-                    end_run()
+                    if blocked_repos:
+                        details = ", ".join(
+                            f"{repo_id} ({reason})"
+                            for repo_id, reason in blocked_repos.items()
+                        )
+                        end_run(note=f"repository work skipped: {details}")
+                    else:
+                        end_run()
                 else:
                     end_run(
                         note=f"failed: {type(failure).__name__}: {failure}",
                         outcome="failed",
                     )
-    return {"processed": processed, "count": len(processed)}
+    return {
+        "processed": processed,
+        "count": len(processed),
+        "blockedRepositories": blocked_repos,
+    }

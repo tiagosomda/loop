@@ -35,13 +35,17 @@ def _order_key(item: dict) -> tuple:
     return (1, items_mod.effective_order(item))
 
 
-def queue() -> list[dict]:
+def queue(excluded_repo_ids: set[str] | None = None) -> list[dict]:
     """Open/in-progress items ordered per the runbook's triage rule.
 
     Callers should call this again before every claim (not cache a snapshot)
     so a new item or reply created mid-run is picked up.
     """
-    raw = items_mod.list_items(list(_QUEUE_STATUSES))
+    excluded = excluded_repo_ids or set()
+    raw = [
+        item for item in items_mod.list_items(list(_QUEUE_STATUSES))
+        if item.get("repoId") not in excluded
+    ]
     return sorted(raw, key=_order_key)
 
 
@@ -54,9 +58,9 @@ def start() -> dict:
     return {"repos": crawl_result, "targets": target_projection, "queue": queue()}
 
 
-def next_item() -> dict | None:
-    """The single next item to work, freshly queried."""
-    q = queue()
+def next_item(excluded_repo_ids: set[str] | None = None) -> dict | None:
+    """The next item, excluding repositories quarantined for this run."""
+    q = queue(excluded_repo_ids)
     return q[0] if q else None
 
 
