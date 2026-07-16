@@ -7,6 +7,7 @@ import '../models/models.dart';
 import '../services/board_service.dart';
 import '../widgets/attachment_gallery.dart';
 import '../widgets/widgets.dart';
+import 'text_editor_screen.dart';
 
 class ItemScreen extends StatefulWidget {
   const ItemScreen({super.key, required this.itemId});
@@ -613,46 +614,17 @@ class _MessageBubble extends StatelessWidget {
 
   Future<void> _edit(BuildContext context) async {
     final board = context.read<BoardService>();
-    final controller = TextEditingController(text: message.text);
-    final text = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit message'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (hasSubsequent)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  'This message already has a reply, so the agent likely '
-                  "won't pick up the edit — you can still make it.",
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-                ),
-              ),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              minLines: 3,
-              maxLines: 10,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+    final text = await openTextEditorScreen(
+      context,
+      title: 'Edit message',
+      initialText: message.text,
+      saveLabel: 'Save',
+      hintText: 'Message',
+      notice: hasSubsequent
+          ? 'This message already has a reply, so the agent likely '
+                "won't pick up the edit — you can still make it."
+          : null,
+      allowEmpty: false,
     );
     if (text == null || text.isEmpty || text == message.text) return;
     await board.editMessage(itemId, message.id, text);

@@ -2,8 +2,9 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:dev_loop/models/models.dart';
-import 'package:dev_loop/services/board_service.dart';
 import 'package:dev_loop/screens/new_item_sheet.dart';
+import 'package:dev_loop/screens/text_editor_screen.dart';
+import 'package:dev_loop/services/board_service.dart';
 import 'package:dev_loop/widgets/attachment_gallery.dart';
 import 'package:dev_loop/widgets/brand_logo.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -11,6 +12,113 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('full-screen text editing', () {
+    testWidgets('gives selection gestures an editor-owned scroll surface', (
+      tester,
+    ) async {
+      const initialText = 'A description with enough text to edit.';
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: TextEditorScreen(
+            title: 'Edit message',
+            initialText: initialText,
+            saveLabel: 'Save',
+            notice: 'A reply already exists.',
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final fieldFinder = find.byKey(const ValueKey('text-editor-field'));
+      final field = tester.widget<TextField>(fieldFinder);
+
+      expect(field.expands, isTrue);
+      expect(field.minLines, isNull);
+      expect(field.maxLines, isNull);
+      expect(field.controller!.text, initialText);
+      expect(
+        field.controller!.selection,
+        const TextSelection.collapsed(offset: initialText.length),
+      );
+      expect(
+        find.ancestor(of: fieldFinder, matching: find.byType(Scrollable)),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('text-editor-notice')), findsOneWidget);
+    });
+
+    testWidgets('returns trimmed text from the full-screen route', (
+      tester,
+    ) async {
+      String? result;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () async {
+                result = await openTextEditorScreen(
+                  context,
+                  title: 'Description',
+                  initialText: 'Original',
+                  saveLabel: 'Done',
+                );
+              },
+              child: const Text('Open editor'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open editor'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TextEditorScreen), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('text-editor-field')),
+        '  Updated description  ',
+      );
+      await tester.tap(find.byKey(const ValueKey('text-editor-save')));
+      await tester.pumpAndSettle();
+
+      expect(result, 'Updated description');
+      expect(find.byType(TextEditorScreen), findsNothing);
+    });
+
+    testWidgets('does not allow an existing message to be saved empty', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: TextEditorScreen(
+            title: 'Edit message',
+            initialText: '',
+            saveLabel: 'Save',
+            allowEmpty: false,
+          ),
+        ),
+      );
+
+      TextButton saveButton() => tester.widget<TextButton>(
+        find.byKey(const ValueKey('text-editor-save')),
+      );
+
+      expect(saveButton().onPressed, isNull);
+      await tester.enterText(
+        find.byKey(const ValueKey('text-editor-field')),
+        '   ',
+      );
+      await tester.pump();
+      expect(saveButton().onPressed, isNull);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('text-editor-field')),
+        'Message',
+      );
+      await tester.pump();
+      expect(saveButton().onPressed, isNotNull);
+    });
+  });
+
   group('pull-to-refresh visual confirmation', () {
     // Regression test for the reported bug: pulling down on the board's
     // list view (a RefreshIndicator wrapping a ReorderableListView.builder,

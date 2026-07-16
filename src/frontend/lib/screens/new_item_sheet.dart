@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../services/board_service.dart';
 import 'home_screen.dart';
+import 'text_editor_screen.dart';
 
 /// Opens the full-screen "new action item" composer.
 Future<void> openNewItemScreen(BuildContext context) {
@@ -101,13 +102,31 @@ class _NewItemScreenState extends State<NewItemScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _message,
-              minLines: 4,
-              maxLines: 10,
-              decoration: const InputDecoration(
-                labelText: 'Description / first message',
-                alignLabelWithHint: true,
+            Semantics(
+              button: true,
+              label: 'Description / first message',
+              hint: 'Opens a full-screen text editor',
+              child: InkWell(
+                key: const ValueKey('description-editor-launcher'),
+                borderRadius: BorderRadius.circular(12),
+                onTap: _editDescription,
+                child: IgnorePointer(
+                  child: TextField(
+                    controller: _message,
+                    readOnly: true,
+                    canRequestFocus: false,
+                    showCursor: false,
+                    enableInteractiveSelection: false,
+                    minLines: 4,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: 'Description / first message',
+                      hintText: 'Tap to add a description…',
+                      alignLabelWithHint: true,
+                      suffixIcon: Icon(Icons.open_in_full),
+                    ),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -143,6 +162,17 @@ class _NewItemScreenState extends State<NewItemScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _editDescription() async {
+    final text = await openTextEditorScreen(
+      context,
+      title: 'Description',
+      initialText: _message.text,
+      saveLabel: 'Done',
+      hintText: 'Describe what needs to happen…',
+    );
+    if (text != null && mounted) _message.text = text;
   }
 
   Future<void> _pickFiles() async {
