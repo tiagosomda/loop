@@ -150,19 +150,39 @@ class BoardService {
       .doc(itemId)
       .update({'status': status, 'updatedAt': FieldValue.serverTimestamp()});
 
-  /// Archiving is an orthogonal flag to `status`: an archived item keeps its
-  /// status but drops out of the default board view.
-  Future<void> archiveItem(String itemId) => _items.doc(itemId).update({
-    'archived': true,
-    'archivedAt': FieldValue.serverTimestamp(),
-    'updatedAt': FieldValue.serverTimestamp(),
-  });
+  Future<void> setStatuses(Iterable<String> itemIds, String status) async {
+    await _updateItems(itemIds, {
+      'status': status,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
 
-  Future<void> unarchiveItem(String itemId) => _items.doc(itemId).update({
-    'archived': false,
-    'archivedAt': null,
-    'updatedAt': FieldValue.serverTimestamp(),
-  });
+  /// Removes items from the active board. By default archiving is terminal and
+  /// also closes the item; the profile preference can opt out of that behavior.
+  Future<void> archiveItem(String itemId, {bool closeItem = true}) =>
+      archiveItems([itemId], closeItems: closeItem);
+
+  Future<void> archiveItems(
+    Iterable<String> itemIds, {
+    bool closeItems = true,
+  }) async {
+    await _updateItems(itemIds, {
+      'archived': true,
+      'archivedAt': FieldValue.serverTimestamp(),
+      if (closeItems) 'status': 'closed',
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> unarchiveItem(String itemId) => unarchiveItems([itemId]);
+
+  Future<void> unarchiveItems(Iterable<String> itemIds) async {
+    await _updateItems(itemIds, {
+      'archived': false,
+      'archivedAt': null,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
 
   /// Archive every closed, not-yet-archived item in one batch. Returns the
   /// number of items archived.
@@ -181,6 +201,80 @@ class BoardService {
     }
     if (count > 0) await batch.commit();
     return count;
+  }
+
+  /// Permanently deletes items and their known child data. Firestore does not
+  /// cascade document deletion into subcollections, so messages and run
+  /// records are removed explicitly; attachment objects are removed from
+  /// Storage before their message metadata disappears.
+  Future<void> deleteItem(String itemId) => deleteItems([itemId]);
+
+  Future<void> deleteItems(Iterable<String> itemIds) async {
+    for (final itemId in itemIds.toSet()) {
+      await _deleteItem(itemId);
+    }
+  }
+
+  Future<void> _deleteItem(String itemId) async {
+    final itemRef = _items.doc(itemId);
+    final messages = await itemRef.collection('messages').get();
+    final runs = await itemRef.collection('runs').get();
+
+    final storagePaths = <String>{};
+    for (final message in messages.docs) {
+      for (final value
+          in (message.data()['attachments'] as List? ?? const [])) {
+        final attachment = Attachment.fromMap(
+          Map<String, dynamic>.from(value as Map),
+        );
+        if (attachment.storagePath.isNotEmpty) {
+          storagePaths.add(attachment.storagePath);
+        }
+      }
+    }
+    for (final path in storagePaths) {
+      try {
+        await _storage.ref(path).delete();
+      } on FirebaseException catch (error) {
+        if (error.code != 'object-not-found') rethrow;
+      }
+    }
+
+    await _deleteDocuments([
+      for (final doc in messages.docs) doc.reference,
+      for (final doc in runs.docs) doc.reference,
+    ]);
+    await itemRef.delete();
+  }
+
+  /// Firestore batches allow at most 500 writes. Staying below that limit
+  /// keeps large threads deletable and also supports large multi-selections.
+  Future<void> _deleteDocuments(
+    List<DocumentReference<Map<String, dynamic>>> documents,
+  ) async {
+    for (var start = 0; start < documents.length; start += 450) {
+      final batch = _db.batch();
+      final end = (start + 450).clamp(0, documents.length);
+      for (final document in documents.sublist(start, end)) {
+        batch.delete(document);
+      }
+      await batch.commit();
+    }
+  }
+
+  Future<void> _updateItems(
+    Iterable<String> itemIds,
+    Map<String, dynamic> updates,
+  ) async {
+    final ids = itemIds.toSet().toList(growable: false);
+    for (var start = 0; start < ids.length; start += 450) {
+      final batch = _db.batch();
+      final end = (start + 450).clamp(0, ids.length);
+      for (final itemId in ids.sublist(start, end)) {
+        batch.update(_items.doc(itemId), updates);
+      }
+      await batch.commit();
+    }
   }
 
   Future<void> setRoutingPreferences(

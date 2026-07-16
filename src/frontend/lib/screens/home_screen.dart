@@ -11,64 +11,205 @@ import 'item_screen.dart';
 import 'new_item_sheet.dart';
 import 'profile_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final Set<String> _selectedIds = {};
+
+  bool get _selectionMode => _selectedIds.isNotEmpty;
+
+  void _setSelected(String itemId, bool selected) {
+    setState(() {
+      if (selected) {
+        _selectedIds.add(itemId);
+      } else {
+        _selectedIds.remove(itemId);
+      }
+    });
+  }
+
+  void _clearSelection() => setState(_selectedIds.clear);
+
+  void _toggleAllVisible(List<ActionItem> visibleItems) {
+    final visibleIds = visibleItems.map((item) => item.id).toSet();
+    final allSelected =
+        visibleIds.isNotEmpty && visibleIds.every(_selectedIds.contains);
+    setState(() {
+      if (allSelected) {
+        _selectedIds.removeAll(visibleIds);
+      } else {
+        _selectedIds.addAll(visibleIds);
+      }
+    });
+  }
+
+  Future<void> _changeSelectedStatus(BoardService board, String status) async {
+    final count = _selectedIds.length;
+    try {
+      await board.setStatuses(_selectedIds, status);
+      if (!mounted) return;
+      _clearSelection();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$count item${count == 1 ? '' : 's'} → $status'),
+        ),
+      );
+    } catch (error) {
+      if (mounted) _showActionError(context, 'change status', error);
+    }
+  }
+
+  Future<void> _archiveSelected(BoardService board, AppState app) async {
+    final count = _selectedIds.length;
+    try {
+      if (app.showArchived) {
+        await board.unarchiveItems(_selectedIds);
+      } else {
+        await board.archiveItems(
+          _selectedIds,
+          closeItems: app.archiveClosesItems,
+        );
+      }
+      if (!mounted) return;
+      _clearSelection();
+      final verb = app.showArchived ? 'Restored' : 'Archived';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$verb $count item${count == 1 ? '' : 's'}')),
+      );
+    } catch (error) {
+      if (mounted) {
+        _showActionError(
+          context,
+          app.showArchived ? 'restore items' : 'archive items',
+          error,
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteSelected(BoardService board) async {
+    final ids = Set<String>.of(_selectedIds);
+    final confirmed = await _confirmDelete(context, ids.length);
+    if (!confirmed || !mounted) return;
+    try {
+      await board.deleteItems(ids);
+      if (!mounted) return;
+      _clearSelection();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Deleted ${ids.length} item${ids.length == 1 ? '' : 's'}',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (mounted) _showActionError(context, 'delete items', error);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final board = context.read<BoardService>();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: StreamBuilder<ScheduleInfo>(
-          stream: board.schedule(),
-          builder: (context, snapshot) => BrandTitle(
-            scheduleTimes: snapshot.data?.viewerLocalTimes ?? const [],
-          ),
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Profile',
-            icon: const Icon(Icons.person_outline),
-            onPressed: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const ProfileScreen())),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      // Always-visible affordance for creating a new item. Hidden while
-      // viewing the archive, which has no "new item" concept — matches the
-      // list's own "No archived items" empty state, which offers no add
-      // prompt either.
-      floatingActionButton: app.showArchived
-          ? null
-          : FloatingActionButton(
-              tooltip: 'New action item',
-              onPressed: () => openNewItemScreen(context),
-              child: const Icon(Icons.add),
-            ),
-      body: StreamBuilder<List<ActionItem>>(
-        stream: board.items(),
-        builder: (context, snap) {
-          if (snap.hasError) {
-            return Center(child: Text('Error: ${snap.error}'));
-          }
-          if (!snap.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final items = _filtered(snap.data!, app);
-          // The renumber fallback needs the *whole* active board (every
-          // status, ignoring search/repo filters) to find the real
-          // neighbors bounding whatever subset is being reordered — a
-          // single kanban column or the filtered list are just subsets of
-          // this. See BoardService.reorderItem.
-          final allActive = [
-            for (final i in snap.data!)
-              if (!i.archived) i,
-          ]..sort((a, b) => effectiveOrder(a).compareTo(effectiveOrder(b)));
-          return Column(
+    return StreamBuilder<List<ActionItem>>(
+      stream: board.items(),
+      builder: (context, snap) {
+        if (snap.hasError) {
+          return Scaffold(body: Center(child: Text('Error: ${snap.error}')));
+        }
+        if (!snap.hasData) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final items = _filtered(snap.data!, app);
+        // The renumber fallback needs the *whole* active board (every
+        // status, ignoring search/repo filters) to find the real
+        // neighbors bounding whatever subset is being reordered — a
+        // single kanban column or the filtered list are just subsets of
+        // this. See BoardService.reorderItem.
+        final allActive = [
+          for (final i in snap.data!)
+            if (!i.archived) i,
+        ]..sort((a, b) => effectiveOrder(a).compareTo(effectiveOrder(b)));
+        return Scaffold(
+          appBar: _selectionMode
+              ? AppBar(
+                  leading: IconButton(
+                    tooltip: 'Cancel selection',
+                    icon: const Icon(Icons.close),
+                    onPressed: _clearSelection,
+                  ),
+                  title: Text('${_selectedIds.length} selected'),
+                  actions: [
+                    IconButton(
+                      tooltip: 'Select all visible items',
+                      icon: const Icon(Icons.select_all),
+                      onPressed: () => _toggleAllVisible(items),
+                    ),
+                    PopupMenuButton<String>(
+                      tooltip: 'Change status',
+                      icon: const Icon(Icons.flag_outlined),
+                      onSelected: (status) =>
+                          _changeSelectedStatus(board, status),
+                      itemBuilder: (context) => [
+                        for (final status in itemStatuses)
+                          PopupMenuItem(value: status, child: Text(status)),
+                      ],
+                    ),
+                    IconButton(
+                      tooltip: app.showArchived ? 'Unarchive' : 'Archive',
+                      icon: Icon(
+                        app.showArchived
+                            ? Icons.unarchive_outlined
+                            : Icons.archive_outlined,
+                      ),
+                      onPressed: () => _archiveSelected(board, app),
+                    ),
+                    IconButton(
+                      tooltip: 'Delete',
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => _deleteSelected(board),
+                    ),
+                  ],
+                )
+              : AppBar(
+                  title: StreamBuilder<ScheduleInfo>(
+                    stream: board.schedule(),
+                    builder: (context, snapshot) => BrandTitle(
+                      scheduleTimes:
+                          snapshot.data?.viewerLocalTimes ?? const [],
+                    ),
+                  ),
+                  actions: [
+                    IconButton(
+                      tooltip: 'Profile',
+                      icon: const Icon(Icons.person_outline),
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ProfileScreen(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                ),
+          // Hidden in the archive and during selection, where the toolbar
+          // actions are the primary affordance.
+          floatingActionButton: app.showArchived || _selectionMode
+              ? null
+              : FloatingActionButton(
+                  tooltip: 'New action item',
+                  onPressed: () => openNewItemScreen(context),
+                  child: const Icon(Icons.add),
+                ),
+          body: Column(
             children: [
               _BoardControls(app: app),
               // Explicit refresh affordance, on top of RefreshIndicator's own
@@ -97,6 +238,8 @@ class HomeScreen extends StatelessWidget {
                   BoardView.list => _ListView(
                     items: items,
                     showArchived: app.showArchived,
+                    selectedIds: _selectedIds,
+                    onSelectionChanged: _setSelected,
                     onRefresh: board.refresh,
                     onReorder: (i, j) =>
                         board.reorderItem(items, i, j, allItems: allActive),
@@ -107,14 +250,18 @@ class HomeScreen extends StatelessWidget {
                       for (final status in itemStatuses)
                         if (app.statusFilter.contains(status)) status,
                     ],
-                    reorderEnabled: !app.showArchived,
+                    reorderEnabled: !app.showArchived && !_selectionMode,
+                    selectedIds: _selectedIds,
+                    onSelectionChanged: _setSelected,
                     onRefresh: board.refresh,
                     onReorder: (column, i, j) =>
                         board.reorderItem(column, i, j, allItems: allActive),
                   ),
                   BoardView.projects => _ProjectView(
                     items: items,
-                    reorderEnabled: !app.showArchived,
+                    reorderEnabled: !app.showArchived && !_selectionMode,
+                    selectedIds: _selectedIds,
+                    onSelectionChanged: _setSelected,
                     onRefresh: board.refresh,
                     onReorder: (project, i, j) =>
                         board.reorderItem(project, i, j, allItems: allActive),
@@ -122,9 +269,9 @@ class HomeScreen extends StatelessWidget {
                 },
               ),
             ],
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -151,6 +298,36 @@ class HomeScreen extends StatelessWidget {
     result.sort((a, b) => effectiveOrder(a).compareTo(effectiveOrder(b)));
     return result;
   }
+}
+
+void _showActionError(BuildContext context, String action, Object error) {
+  ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text('Failed to $action: $error')));
+}
+
+Future<bool> _confirmDelete(BuildContext context, int count) async {
+  return await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Delete ${count == 1 ? 'item' : '$count items'}?'),
+          content: const Text(
+            'This permanently deletes the item, its conversation, run history, '
+            'and uploaded attachments. This cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
 }
 
 /// Shows a confirmation dialog, then archives every currently-closed
@@ -438,6 +615,8 @@ class _ListView extends StatelessWidget {
     required this.items,
     required this.onRefresh,
     required this.onReorder,
+    required this.selectedIds,
+    required this.onSelectionChanged,
     this.showArchived = false,
   });
 
@@ -445,6 +624,8 @@ class _ListView extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final void Function(int oldIndex, int newIndex) onReorder;
   final bool showArchived;
+  final Set<String> selectedIds;
+  final void Function(String itemId, bool selected) onSelectionChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -476,14 +657,17 @@ class _ListView extends StatelessWidget {
           // Archived items are a static, no-fuss history — manual order only
           // governs the active board (and, in turn, agent pickup order), so
           // reordering is disabled here.
-          : showArchived
+          : showArchived || selectedIds.isNotEmpty
           ? ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.only(top: 4, bottom: 24),
               itemCount: items.length,
-              itemBuilder: (context, i) => ItemCard(
+              itemBuilder: (context, i) => _ActionableItemCard(
                 item: items[i],
-                onTap: () => openItem(context, items[i].id),
+                selected: selectedIds.contains(items[i].id),
+                selectionMode: selectedIds.isNotEmpty,
+                onSelectionChanged: (selected) =>
+                    onSelectionChanged(items[i].id, selected),
               ),
             )
           : ReorderableListView.builder(
@@ -493,11 +677,14 @@ class _ListView extends StatelessWidget {
               itemCount: items.length,
               onReorderItem: onReorder,
               proxyDecorator: dragProxyDecorator,
-              itemBuilder: (context, i) => ItemCard(
+              itemBuilder: (context, i) => _ActionableItemCard(
                 key: ValueKey(items[i].id),
                 item: items[i],
-                onTap: () => openItem(context, items[i].id),
                 dragHandle: DragHandle(index: i),
+                selected: selectedIds.contains(items[i].id),
+                selectionMode: selectedIds.isNotEmpty,
+                onSelectionChanged: (selected) =>
+                    onSelectionChanged(items[i].id, selected),
               ),
             ),
     );
@@ -509,6 +696,8 @@ class _KanbanView extends StatelessWidget {
     required this.items,
     required this.statuses,
     required this.reorderEnabled,
+    required this.selectedIds,
+    required this.onSelectionChanged,
     required this.onRefresh,
     required this.onReorder,
   });
@@ -516,6 +705,8 @@ class _KanbanView extends StatelessWidget {
   final List<ActionItem> items;
   final List<String> statuses;
   final bool reorderEnabled;
+  final Set<String> selectedIds;
+  final void Function(String itemId, bool selected) onSelectionChanged;
   final Future<void> Function() onRefresh;
   // Manual order applies within each status column too — dragging a card up
   // or down a column reorders it only among that column's items, so a card
@@ -583,9 +774,12 @@ class _KanbanView extends StatelessWidget {
                             physics: const AlwaysScrollableScrollPhysics(),
                             padding: const EdgeInsets.only(bottom: 8),
                             itemCount: column.length,
-                            itemBuilder: (context, i) => ItemCard(
+                            itemBuilder: (context, i) => _ActionableItemCard(
                               item: column[i],
-                              onTap: () => openItem(context, column[i].id),
+                              selected: selectedIds.contains(column[i].id),
+                              selectionMode: selectedIds.isNotEmpty,
+                              onSelectionChanged: (selected) =>
+                                  onSelectionChanged(column[i].id, selected),
                             ),
                           );
                         }
@@ -596,11 +790,14 @@ class _KanbanView extends StatelessWidget {
                           itemCount: column.length,
                           onReorderItem: (i, j) => onReorder(column, i, j),
                           proxyDecorator: dragProxyDecorator,
-                          itemBuilder: (context, i) => ItemCard(
+                          itemBuilder: (context, i) => _ActionableItemCard(
                             key: ValueKey(column[i].id),
                             item: column[i],
-                            onTap: () => openItem(context, column[i].id),
                             dragHandle: DragHandle(index: i),
+                            selected: selectedIds.contains(column[i].id),
+                            selectionMode: selectedIds.isNotEmpty,
+                            onSelectionChanged: (selected) =>
+                                onSelectionChanged(column[i].id, selected),
                           ),
                         );
                       },
@@ -623,12 +820,16 @@ class _ProjectView extends StatelessWidget {
   const _ProjectView({
     required this.items,
     required this.reorderEnabled,
+    required this.selectedIds,
+    required this.onSelectionChanged,
     required this.onRefresh,
     required this.onReorder,
   });
 
   final List<ActionItem> items;
   final bool reorderEnabled;
+  final Set<String> selectedIds;
+  final void Function(String itemId, bool selected) onSelectionChanged;
   final Future<void> Function() onRefresh;
   final void Function(List<ActionItem> project, int oldIndex, int newIndex)
   onReorder;
@@ -707,21 +908,39 @@ class _ProjectView extends StatelessWidget {
                                 onReorderItem: (i, j) =>
                                     onReorder(project, i, j),
                                 proxyDecorator: dragProxyDecorator,
-                                itemBuilder: (context, i) => ItemCard(
-                                  key: ValueKey(project[i].id),
-                                  item: project[i],
-                                  onTap: () => openItem(context, project[i].id),
-                                  dragHandle: DragHandle(index: i),
-                                ),
+                                itemBuilder: (context, i) =>
+                                    _ActionableItemCard(
+                                      key: ValueKey(project[i].id),
+                                      item: project[i],
+                                      dragHandle: DragHandle(index: i),
+                                      selected: selectedIds.contains(
+                                        project[i].id,
+                                      ),
+                                      selectionMode: selectedIds.isNotEmpty,
+                                      onSelectionChanged: (selected) =>
+                                          onSelectionChanged(
+                                            project[i].id,
+                                            selected,
+                                          ),
+                                    ),
                               )
                             : ListView.builder(
                                 physics: const AlwaysScrollableScrollPhysics(),
                                 padding: const EdgeInsets.only(bottom: 8),
                                 itemCount: project.length,
-                                itemBuilder: (context, i) => ItemCard(
-                                  item: project[i],
-                                  onTap: () => openItem(context, project[i].id),
-                                ),
+                                itemBuilder: (context, i) =>
+                                    _ActionableItemCard(
+                                      item: project[i],
+                                      selected: selectedIds.contains(
+                                        project[i].id,
+                                      ),
+                                      selectionMode: selectedIds.isNotEmpty,
+                                      onSelectionChanged: (selected) =>
+                                          onSelectionChanged(
+                                            project[i].id,
+                                            selected,
+                                          ),
+                                    ),
                               ),
                       ),
                     ),
@@ -732,6 +951,237 @@ class _ProjectView extends StatelessWidget {
           ),
       ],
     );
+  }
+}
+
+/// Board card with Gmail-style selection and two-way swipe affordances. A
+/// swipe intentionally settles back into place after opening its action sheet,
+/// because both directions offer a choice rather than one destructive default.
+class _ActionableItemCard extends StatelessWidget {
+  const _ActionableItemCard({
+    super.key,
+    required this.item,
+    required this.selected,
+    required this.selectionMode,
+    required this.onSelectionChanged,
+    this.dragHandle,
+  });
+
+  final ActionItem item;
+  final bool selected;
+  final bool selectionMode;
+  final ValueChanged<bool> onSelectionChanged;
+  final Widget? dragHandle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dismissible(
+      key: ValueKey('swipe-${item.id}'),
+      direction: selectionMode
+          ? DismissDirection.none
+          : DismissDirection.horizontal,
+      confirmDismiss: selectionMode
+          ? null
+          : (direction) async {
+              if (direction == DismissDirection.startToEnd) {
+                await _showStatusActions(context);
+              } else {
+                await _showArchiveActions(context);
+              }
+              return false;
+            },
+      background: _swipeBackground(
+        context,
+        alignment: Alignment.centerLeft,
+        color: Colors.green,
+        icon: Icons.task_alt,
+        label: 'Complete · close',
+      ),
+      secondaryBackground: _swipeBackground(
+        context,
+        alignment: Alignment.centerRight,
+        color: Colors.red,
+        icon: Icons.archive_outlined,
+        label: item.archived ? 'Restore · delete' : 'Archive · delete',
+      ),
+      child: ItemCard(
+        item: item,
+        dragHandle: dragHandle,
+        selected: selected,
+        selectionMode: selectionMode,
+        onSelectionChanged: onSelectionChanged,
+        onTap: () => openItem(context, item.id),
+      ),
+    );
+  }
+
+  Widget _swipeBackground(
+    BuildContext context, {
+    required Alignment alignment,
+    required Color color,
+    required IconData icon,
+    required String label,
+  }) {
+    final onColor =
+        ThemeData.estimateBrightnessForColor(color) == Brightness.dark
+        ? Colors.white
+        : Colors.black;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      alignment: alignment,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(AppTheme.radius),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: onColor),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(color: onColor, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showStatusActions(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text(
+                'Change status',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.task_alt),
+              title: const Text('Mark completed'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _setStatus(context, 'completed');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.check_circle_outline),
+              title: const Text('Mark closed'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _setStatus(context, 'closed');
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showArchiveActions(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(
+                item.archived ? 'Archived item' : 'Item actions',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            ListTile(
+              leading: Icon(
+                item.archived
+                    ? Icons.unarchive_outlined
+                    : Icons.archive_outlined,
+              ),
+              title: Text(item.archived ? 'Unarchive' : 'Archive'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _toggleArchive(context);
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                Icons.delete_outline,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              title: Text(
+                'Delete permanently',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _delete(context);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _setStatus(BuildContext context, String status) async {
+    try {
+      await context.read<BoardService>().setStatus(item.id, status);
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Item marked $status')));
+      }
+    } catch (error) {
+      if (context.mounted) _showActionError(context, 'change status', error);
+    }
+  }
+
+  Future<void> _toggleArchive(BuildContext context) async {
+    final board = context.read<BoardService>();
+    final app = context.read<AppState>();
+    try {
+      if (item.archived) {
+        await board.unarchiveItem(item.id);
+      } else {
+        await board.archiveItem(item.id, closeItem: app.archiveClosesItems);
+      }
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(item.archived ? 'Item restored' : 'Item archived'),
+          ),
+        );
+      }
+    } catch (error) {
+      if (context.mounted) {
+        _showActionError(
+          context,
+          item.archived ? 'restore item' : 'archive item',
+          error,
+        );
+      }
+    }
+  }
+
+  Future<void> _delete(BuildContext context) async {
+    if (!await _confirmDelete(context, 1) || !context.mounted) return;
+    try {
+      await context.read<BoardService>().deleteItem(item.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Item deleted')));
+      }
+    } catch (error) {
+      if (context.mounted) _showActionError(context, 'delete item', error);
+    }
   }
 }
 

@@ -56,10 +56,16 @@ class ItemCard extends StatelessWidget {
     required this.item,
     required this.onTap,
     this.dragHandle,
+    this.selectionMode = false,
+    this.selected = false,
+    this.onSelectionChanged,
   });
 
   final ActionItem item;
   final VoidCallback onTap;
+  final bool selectionMode;
+  final bool selected;
+  final ValueChanged<bool>? onSelectionChanged;
 
   /// Drag handle for manual reordering (typically a
   /// `ReorderableDragStartListener`-wrapped icon). Null when the card is
@@ -72,7 +78,12 @@ class ItemCard extends StatelessWidget {
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
+        onTap: selectionMode
+            ? () => onSelectionChanged?.call(!selected)
+            : onTap,
+        onLongPress: onSelectionChanged == null
+            ? null
+            : () => onSelectionChanged?.call(true),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -80,7 +91,15 @@ class ItemCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  if (dragHandle != null) ...[
+                  if (selectionMode) ...[
+                    Checkbox(
+                      value: selected,
+                      visualDensity: VisualDensity.compact,
+                      onChanged: (value) =>
+                          onSelectionChanged?.call(value ?? false),
+                    ),
+                    const SizedBox(width: 4),
+                  ] else if (dragHandle != null) ...[
                     dragHandle!,
                     const SizedBox(width: 4),
                   ],

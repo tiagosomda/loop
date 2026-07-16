@@ -7,6 +7,7 @@ import 'package:dev_loop/screens/text_editor_screen.dart';
 import 'package:dev_loop/services/board_service.dart';
 import 'package:dev_loop/widgets/attachment_gallery.dart';
 import 'package:dev_loop/widgets/brand_logo.dart';
+import 'package:dev_loop/widgets/widgets.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -226,6 +227,62 @@ void main() {
       'completed',
       'closed',
     ]);
+  });
+
+  group('item card selection', () {
+    final item = ActionItem(
+      id: 'item-1',
+      title: 'Selectable item',
+      repoId: 'owner__repo',
+      status: 'open',
+    );
+
+    testWidgets('normal tap opens and long press starts selection', (
+      tester,
+    ) async {
+      var opened = false;
+      bool? selected;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ItemCard(
+              item: item,
+              onTap: () => opened = true,
+              onSelectionChanged: (value) => selected = value,
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Selectable item'));
+      expect(opened, isTrue);
+
+      await tester.longPress(find.text('Selectable item'));
+      expect(selected, isTrue);
+    });
+
+    testWidgets('tap toggles an item while selection mode is active', (
+      tester,
+    ) async {
+      bool? selected;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ItemCard(
+              item: item,
+              selected: true,
+              selectionMode: true,
+              onTap: () => fail('selection tap must not open the item'),
+              onSelectionChanged: (value) => selected = value,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(Checkbox), findsOneWidget);
+      await tester.tap(find.text('Selectable item'));
+      expect(selected, isFalse);
+    });
   });
 
   test('routing catalog visibility is entirely data driven', () {

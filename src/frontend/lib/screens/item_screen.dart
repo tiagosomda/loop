@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/models.dart';
 import '../services/board_service.dart';
+import '../state/app_state.dart';
 import '../widgets/attachment_gallery.dart';
 import '../widgets/widgets.dart';
 import 'text_editor_screen.dart';
@@ -42,6 +43,7 @@ class _ItemScreenState extends State<ItemScreen> {
             title: Text(item?.title ?? '…'),
             actions: [
               if (item != null) _ArchiveButton(item: item),
+              if (item != null) _DeleteButton(item: item),
               if (item != null) _RepoLinkButton(repoId: item.repoId),
               const SizedBox(width: 8),
             ],
@@ -363,8 +365,8 @@ class _StatusPill extends StatelessWidget {
   }
 }
 
-/// App-bar toggle to archive/unarchive this single item. Archiving hides it
-/// from the default board without touching its status.
+/// App-bar toggle to archive/unarchive this single item. Unless disabled in
+/// profile settings, archiving also marks the item closed.
 class _ArchiveButton extends StatelessWidget {
   const _ArchiveButton({required this.item});
 
@@ -386,10 +388,63 @@ class _ArchiveButton extends StatelessWidget {
             const SnackBar(content: Text('Item unarchived')),
           );
         } else {
-          await board.archiveItem(item.id);
+          await board.archiveItem(
+            item.id,
+            closeItem: context.read<AppState>().archiveClosesItems,
+          );
           messenger.showSnackBar(
             const SnackBar(content: Text('Item archived')),
           );
+        }
+      },
+    );
+  }
+}
+
+class _DeleteButton extends StatelessWidget {
+  const _DeleteButton({required this.item});
+
+  final ActionItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: 'Delete',
+      icon: const Icon(Icons.delete_outline),
+      onPressed: () async {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Delete item?'),
+            content: const Text(
+              'This permanently deletes the item, its conversation, run '
+              'history, and uploaded attachments. This cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true || !context.mounted) return;
+        final messenger = ScaffoldMessenger.of(context);
+        try {
+          await context.read<BoardService>().deleteItem(item.id);
+          if (!context.mounted) return;
+          Navigator.of(context).pop();
+          messenger.showSnackBar(const SnackBar(content: Text('Item deleted')));
+        } catch (error) {
+          if (context.mounted) {
+            messenger.showSnackBar(
+              SnackBar(content: Text('Failed to delete item: $error')),
+            );
+          }
         }
       },
     );

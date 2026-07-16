@@ -10,11 +10,13 @@ enum BoardView { list, kanban, projects }
 const _statusFilterPrefsKey = 'statusFilter';
 const _statusFilterVersionPrefsKey = 'statusFilterVersion';
 const _statusFilterVersion = 2;
+const _archiveClosesItemsPrefsKey = 'archiveClosesItems';
 
 class AppState extends ChangeNotifier {
   AppState() {
     _restoreTheme();
     _restoreStatusFilter();
+    _restoreArchiveBehavior();
     FirebaseAuth.instance.authStateChanges().listen((u) {
       user = u;
       notifyListeners();
@@ -24,6 +26,9 @@ class AppState extends ChangeNotifier {
   User? user;
   ThemeMode themeMode = ThemeMode.system;
   BoardView boardView = BoardView.list;
+  // Archiving is normally a terminal action. Keep this preference local to
+  // the signed-in app, alongside theme and filter preferences.
+  bool archiveClosesItems = true;
 
   // board filters
   String search = '';
@@ -57,6 +62,20 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('themeMode', themeMode.name);
+  }
+
+  Future<void> _restoreArchiveBehavior() async {
+    final prefs = await SharedPreferences.getInstance();
+    archiveClosesItems = prefs.getBool(_archiveClosesItemsPrefsKey) ?? true;
+    notifyListeners();
+  }
+
+  Future<void> setArchiveClosesItems(bool value) async {
+    if (archiveClosesItems == value) return;
+    archiveClosesItems = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_archiveClosesItemsPrefsKey, value);
   }
 
   void setBoardView(BoardView view) {
