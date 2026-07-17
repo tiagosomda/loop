@@ -74,6 +74,13 @@ void main() {
       await tester.tap(find.text('Open editor'));
       await tester.pumpAndSettle();
       expect(find.byType(TextEditorScreen), findsOneWidget);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('text-editor-field')))
+            .focusNode!
+            .hasFocus,
+        isTrue,
+      );
 
       await tester.enterText(
         find.byKey(const ValueKey('text-editor-field')),

@@ -11,6 +11,11 @@ Future<String?> openTextEditorScreen(
   String? notice,
   bool allowEmpty = true,
 }) {
+  // Release the field on the previous route before starting the transition.
+  // Otherwise iOS can finish closing that field's input connection after the
+  // editor has already tried to open its own, leaving the editor focused but
+  // with no keyboard.
+  FocusScope.of(context).unfocus();
   return Navigator.of(context).push<String>(
     MaterialPageRoute(
       fullscreenDialog: true,
@@ -52,6 +57,8 @@ class TextEditorScreen extends StatefulWidget {
 
 class _TextEditorScreenState extends State<TextEditorScreen> {
   late final TextEditingController _controller;
+  final FocusNode _focusNode = FocusNode();
+  Animation<double>? _routeAnimation;
 
   @override
   void initState() {
@@ -61,7 +68,33 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final animation = ModalRoute.of(context)?.animation;
+    if (identical(animation, _routeAnimation)) return;
+    _routeAnimation?.removeStatusListener(_handleRouteAnimation);
+    _routeAnimation = animation;
+    if (animation == null || animation.status == AnimationStatus.completed) {
+      _requestFocus();
+    } else {
+      animation.addStatusListener(_handleRouteAnimation);
+    }
+  }
+
+  void _handleRouteAnimation(AnimationStatus status) {
+    if (status == AnimationStatus.completed) _requestFocus();
+  }
+
+  void _requestFocus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
+
+  @override
   void dispose() {
+    _routeAnimation?.removeStatusListener(_handleRouteAnimation);
+    _focusNode.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -123,7 +156,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
                 child: TextField(
                   key: const ValueKey('text-editor-field'),
                   controller: _controller,
-                  autofocus: true,
+                  focusNode: _focusNode,
                   expands: true,
                   minLines: null,
                   maxLines: null,
