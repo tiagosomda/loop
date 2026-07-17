@@ -180,6 +180,48 @@ class AutonomousTests(unittest.TestCase):
         self.assertEqual("high", dispatched[0]["effort"])
         self.assertEqual("clear", result["processed"][1]["itemId"])
 
+    def test_invalid_router_decision_falls_back_to_configured_default(self):
+        # A weak local router that emits an out-of-catalog target raises a
+        # non-abstention RoutingError; the loop must still fall back rather than
+        # hard-fail the item and block its repository.
+        dispatched = []
+        result = autonomous.execute(
+            start_run=lambda: None,
+            next_item=lambda _blocked, iterator=iter([
+                {"id": "item-1", "status": "open", "repoId": "repo"}, None
+            ]): next(iterator),
+            end_run=lambda **_kwargs: None,
+            build_context=lambda item_id: {
+                "item": {"id": item_id},
+                "requested": {"provider": None, "model": None, "effort": None},
+                "allowedTargets": [{
+                    "targetId": "claude-standard",
+                    "adapter": "claude-code",
+                    "models": ["claude-opus-4-8"],
+                    "effortLevels": ["high"],
+                }],
+            },
+            choose=lambda _: (_ for _ in ()).throw(router.RoutingError(
+                "decision target is not currently allowed"
+            )),
+            load_catalog=lambda: {
+                "fallbackAssignment": {
+                    "targetId": "claude-standard", "provider": "claude-code",
+                    "model": "claude-opus-4-8", "effort": "high",
+                },
+                "targets": [{"targetId": "claude-standard", "enabled": True}],
+            },
+            adapter_factory=lambda _: object(),
+            dispatch=lambda _item_id, decision, *_args, **_kwargs: (
+                dispatched.append(decision) or "run",
+                WorkerResult(outcome="succeeded", summary="done"),
+            ),
+            lock=no_lock,
+        )
+        self.assertEqual("succeeded", result["processed"][0]["outcome"])
+        self.assertEqual("claude-standard", dispatched[0]["targetId"])
+        self.assertEqual("claude-opus-4-8", dispatched[0]["model"])
+
     def test_router_abstention_pauses_when_fallback_is_not_allowed(self):
         paused = []
         result = autonomous.execute(

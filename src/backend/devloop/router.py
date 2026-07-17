@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import re
 from datetime import datetime, timezone
@@ -96,6 +97,32 @@ def _attachment_metadata(item: dict[str, Any]) -> list[dict[str, Any]]:
     return result
 
 
+def _decision_schema(context: dict[str, Any]) -> dict[str, Any]:
+    """Constrain targetId/provider/model/effort to values that exist in the
+    allowed targets (and to any hard-requested value). Small local models
+    otherwise conflate these fields -- e.g. emitting a model id as the targetId
+    and provider -- producing decisions that always fail validation. Grammar-
+    constraining the output forces a self-consistent, in-catalog choice."""
+    allowed = context.get("allowedTargets") or []
+    requested = context.get("requested") or {}
+
+    def enum_for(key: str, values: list[str]) -> dict[str, Any]:
+        forced = requested.get(key)
+        return {"enum": [forced] if forced is not None else sorted(set(values))}
+
+    schema = copy.deepcopy(DECISION_SCHEMA)
+    schema["properties"]["targetId"] = {
+        "enum": [target["targetId"] for target in allowed]
+    }
+    schema["properties"]["provider"] = enum_for(
+        "provider", [target["adapter"] for target in allowed])
+    schema["properties"]["model"] = enum_for(
+        "model", [model for target in allowed for model in target["models"]])
+    schema["properties"]["effort"] = enum_for(
+        "effort", [effort for target in allowed for effort in target["effortLevels"]])
+    return schema
+
+
 def decide(context: dict[str, Any], timeout: float = 60.0) -> dict[str, Any]:
     if not context.get("allowedTargets"):
         raise RoutingError("needs-human-routing: no enabled available worker target")
@@ -115,7 +142,8 @@ def decide(context: dict[str, Any], timeout: float = 60.0) -> dict[str, Any]:
         "max_tokens": 300,
         "response_format": {
             "type": "json_schema",
-            "json_schema": {"name": "routing_decision", "schema": DECISION_SCHEMA},
+            "json_schema": {"name": "routing_decision",
+                            "schema": _decision_schema(context)},
         },
     }
     try:

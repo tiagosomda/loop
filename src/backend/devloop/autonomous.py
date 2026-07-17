@@ -94,9 +94,11 @@ def execute(*, start_run: Callable[[], Any] = run.start,
                     try:
                         decision = choose(context)
                     except router.RoutingError as exc:
+                        # Any router failure -- an explicit abstention, an invalid
+                        # or out-of-catalog decision, or an unavailable router --
+                        # falls back to the configured default when that default is
+                        # valid for this item; otherwise it is paused for a human.
                         reason = str(exc)
-                        if not reason.startswith("needs-human-routing:"):
-                            raise
                         catalog = load_catalog()
                         decision = choose_fallback(context, catalog)
                         if decision is None:

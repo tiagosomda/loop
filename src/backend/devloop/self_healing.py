@@ -93,8 +93,10 @@ def execute() -> dict[str, Any]:
             "Preserve the current repository branch and working tree.\n\n"
             f"Observed evidence:\n{evidence}"
         )
+        # Route the diagnostic item automatically; pinning a provider here breaks
+        # self-healing whenever that provider is disabled in the catalog.
         item_id = items.create_item(title, config.SELF_HEALING_REPO_ID, request,
-                                    None, "high", "codex")
+                                    None, "high", None)
         # Once the evidence has a durable board item, advance the cursors so a
         # worker crash cannot create a duplicate diagnostic item tomorrow.
         _save_state(new_state)

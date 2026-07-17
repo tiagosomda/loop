@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "2026-07-15.2",
+  "catalogVersion": "2026-07-17.2",
   "fallbackAssignment": {
-    "targetId": "codex-standard",
-    "provider": "codex",
-    "model": "gpt-5.6-sol",
+    "targetId": "claude-standard",
+    "provider": "claude-code",
+    "model": "claude-opus-4-8",
     "effort": "high"
   },
   "targets": [
@@ -29,7 +29,7 @@
       "role": "worker",
       "adapter": "codex",
       "location": "cloud",
-      "enabled": true,
+      "enabled": false,
       "models": ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"],
       "modelLabels": {
         "gpt-5.6-sol": "GPT-5.6 Sol",
@@ -49,8 +49,13 @@
       "role": "worker",
       "adapter": "claude-code",
       "location": "cloud",
-      "enabled": false,
-      "models": ["default", "sonnet", "opus"],
+      "enabled": true,
+      "models": ["claude-opus-4-8", "claude-sonnet-5", "claude-fable-5"],
+      "modelLabels": {
+        "claude-opus-4-8": "Claude Opus 4.8",
+        "claude-sonnet-5": "Claude Sonnet 5",
+        "claude-fable-5": "Claude Fable 5"
+      },
       "effortLevels": ["low", "medium", "high"],
       "executable": "claude",
       "supportsImages": true,

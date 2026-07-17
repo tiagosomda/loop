@@ -30,6 +30,26 @@ class DispatcherTests(unittest.TestCase):
             "upstream": "origin/main",
             "unpushedCommitCount": 0,
         }
+        # Inline catalog so these lifecycle tests do not depend on which
+        # providers are enabled in the shipped config or installed locally.
+        self.catalog = {
+            "schemaVersion": 1,
+            "catalogVersion": "test-catalog",
+            "targets": [{
+                "targetId": "codex-standard", "role": "worker", "adapter": "codex",
+                "location": "cloud", "enabled": True,
+                "models": ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"],
+                "effortLevels": ["low", "medium", "high", "max"],
+                "supportsImages": True, "supportsRepositoryWrites": True,
+                "supportsNetwork": True, "costTier": "medium", "concurrencyLimit": 1,
+            }],
+        }
+        probe_patch = mock.patch(
+            "devloop.dispatcher.targets.probe",
+            return_value={"available": True, "reason": "test-forced"},
+        )
+        self.addCleanup(probe_patch.stop)
+        probe_patch.start()
 
     def test_lifecycle_order_and_normalized_result(self):
         events = []
@@ -43,6 +63,7 @@ class DispatcherTests(unittest.TestCase):
             create_run=lambda *a, **k: events.append("record-and-claim") or "run-1",
             post_event=lambda *a, **k: events.append("event") or "event-1",
             finalize=lambda *a: events.append("finalize"),
+            catalog=self.catalog,
         )
         self.assertEqual(["record-and-claim", "event", "finalize"], events)
         self.assertEqual("run-1", run_id)
@@ -81,6 +102,7 @@ class DispatcherTests(unittest.TestCase):
             create_run=lambda *a, **k: "run-1",
             post_event=lambda *a, **k: "event",
             finalize=lambda *a: None,
+            catalog=self.catalog,
         )
         self.assertEqual(materialized, adapter.tasks[0]["attachments"])
 
@@ -175,6 +197,7 @@ class DispatcherTests(unittest.TestCase):
             create_run=lambda *a, **k: "run-1",
             post_event=lambda *a, **k: "event",
             finalize=lambda *args: finalized.append(args),
+            catalog=self.catalog,
         )
         self.assertEqual("needs-review", result.outcome)
         self.assertIn("uncommitted changes", result.summary)
@@ -194,6 +217,7 @@ class DispatcherTests(unittest.TestCase):
             postflight=self.clean_postflight,
             create_run=lambda *a, **k: "run-1",
             post_event=lambda *a, **k: "event", finalize=lambda *a: finalized.append(a),
+            catalog=self.catalog,
         )
         self.assertEqual("failed", result.outcome)
         self.assertIn("boom", result.summary)

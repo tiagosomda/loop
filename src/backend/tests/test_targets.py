@@ -27,12 +27,21 @@ class TargetCatalogTests(unittest.TestCase):
             codex["models"],
         )
         self.assertEqual("GPT-5.6 Sol", codex["modelLabels"]["gpt-5.6-sol"])
+        self.assertFalse(codex["enabled"])
         self.assertEqual({
-            "targetId": "codex-standard",
-            "provider": "codex",
-            "model": "gpt-5.6-sol",
+            "targetId": "claude-standard",
+            "provider": "claude-code",
+            "model": "claude-opus-4-8",
             "effort": "high",
         }, catalog["fallbackAssignment"])
+        claude = next(target for target in catalog["targets"]
+                      if target["targetId"] == "claude-standard")
+        self.assertTrue(claude["enabled"])
+        self.assertEqual(
+            ["claude-opus-4-8", "claude-sonnet-5", "claude-fable-5"],
+            claude["models"],
+        )
+        self.assertEqual("Claude Fable 5", claude["modelLabels"]["claude-fable-5"])
 
     def test_duplicate_target_is_rejected(self):
         catalog = targets.load()
@@ -59,23 +68,23 @@ class TargetCatalogTests(unittest.TestCase):
             targets.load(self._catalog_file(catalog))
 
     @mock.patch("devloop.targets.subprocess.run")
-    @mock.patch("devloop.targets.shutil.which", return_value="/usr/bin/codex")
-    def test_enabled_worker_projection_excludes_disabled_claude(self, _which, run):
+    @mock.patch("devloop.targets.shutil.which", return_value="/usr/bin/worker")
+    def test_enabled_worker_projection_includes_only_enabled_workers(self, _which, run):
         run.return_value.returncode = 0
         projection = targets.safe_projection(role="worker", enabled_only=True)
-        self.assertEqual(["codex-standard"],
+        self.assertEqual(["claude-standard"],
                          [target["targetId"] for target in projection["targets"]])
         self.assertNotIn("executable", projection["targets"][0])
         self.assertNotIn("endpoint", projection["targets"][0])
 
     @mock.patch("devloop.targets.subprocess.run")
-    @mock.patch("devloop.targets.shutil.which", return_value="/usr/bin/claude")
-    def test_enabling_claude_in_data_makes_it_visible(self, _which, run):
+    @mock.patch("devloop.targets.shutil.which", return_value="/usr/bin/worker")
+    def test_enabling_codex_in_data_makes_it_visible(self, _which, run):
         run.return_value.returncode = 0
         catalog = targets.load()
-        claude = next(target for target in catalog["targets"]
-                      if target["targetId"] == "claude-standard")
-        claude["enabled"] = True
+        codex = next(target for target in catalog["targets"]
+                     if target["targetId"] == "codex-standard")
+        codex["enabled"] = True
         projection = targets.safe_projection(
             role="worker", enabled_only=True, path=self._catalog_file(catalog))
         self.assertEqual(
@@ -92,10 +101,10 @@ class TargetCatalogTests(unittest.TestCase):
         get.assert_called_once_with("http://127.0.0.1:8080/health", timeout=1.0)
 
     def test_disabled_target_is_not_probed(self):
-        claude = targets.load()["targets"][2]
+        disabled = dict(targets.load()["targets"][2], enabled=False)
         self.assertEqual(
             {"available": False, "reason": "disabled-by-configuration"},
-            targets.probe(claude),
+            targets.probe(disabled),
         )
 
     @mock.patch("devloop.targets.subprocess.run")
@@ -103,7 +112,7 @@ class TargetCatalogTests(unittest.TestCase):
     def test_frontend_projection_is_selectable_and_data_driven(self, _which, run):
         run.return_value.returncode = 0
         projection = targets.frontend_projection()
-        self.assertEqual(["codex-standard"],
+        self.assertEqual(["claude-standard"],
                          [target["targetId"] for target in projection["targets"]])
         self.assertNotIn("availability", projection["targets"][0])
 
@@ -111,7 +120,7 @@ class TargetCatalogTests(unittest.TestCase):
     @mock.patch("devloop.targets.shutil.which", return_value="/usr/bin/codex")
     def test_codex_must_be_authenticated_to_be_available(self, _which, run):
         run.return_value.returncode = 1
-        codex = targets.load()["targets"][1]
+        codex = dict(targets.load()["targets"][1], enabled=True)
         self.assertEqual(
             {"available": False, "reason": "not-authenticated"},
             targets.probe(codex),

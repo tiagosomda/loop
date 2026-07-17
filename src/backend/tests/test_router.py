@@ -43,6 +43,25 @@ class RouterTests(unittest.TestCase):
     def test_valid_decision(self):
         router.validate_decision(context(), decision())
 
+    def test_decision_schema_constrains_targetid_provider_to_catalog(self):
+        schema = router._decision_schema(context())
+        props = schema["properties"]
+        self.assertEqual(["codex-standard"], props["targetId"]["enum"])
+        self.assertEqual(["codex"], props["provider"]["enum"])
+        self.assertEqual(["default"], props["model"]["enum"])
+        self.assertEqual(["high", "low", "max", "medium"], props["effort"]["enum"])
+        # The module-level schema must not be mutated by the per-request copy.
+        self.assertEqual(
+            {"type": "string", "minLength": 1},
+            router.DECISION_SCHEMA["properties"]["targetId"],
+        )
+
+    def test_decision_schema_pins_hard_requested_values(self):
+        value = context()
+        value["requested"]["effort"] = "high"
+        schema = router._decision_schema(value)
+        self.assertEqual(["high"], schema["properties"]["effort"]["enum"])
+
     def test_unknown_target_is_rejected(self):
         value = decision()
         value["targetId"] = "invented"
