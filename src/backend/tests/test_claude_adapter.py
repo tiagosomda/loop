@@ -48,6 +48,53 @@ class ClaudeAdapterContractTests(unittest.TestCase):
         self.assertIn("Do not use it merely to invite optional review", prompt)
 
     @mock.patch("devloop.adapters.claude.subprocess.run")
+    def test_fenced_result_envelope_is_normalized(self, run):
+        # The real `claude --print --output-format json` envelope: the worker
+        # result is fenced JSON inside `result`, with no `structured_output`.
+        run.return_value = mock.Mock(
+            returncode=0, stderr="",
+            stdout=json.dumps({
+                "type": "result", "subtype": "success", "is_error": False,
+                "session_id": "sess-9",
+                "result": "```json\n" + json.dumps({
+                    "outcome": "succeeded", "summary": "Renamed the game",
+                    "filesChanged": ["pubspec.yaml"],
+                    "verification": ["flutter test"],
+                    "providerReference": None, "metadata": {},
+                }) + "\n```",
+            }),
+        )
+        result = ClaudeAdapter().run(task())
+        self.assertEqual("succeeded", result.outcome)
+        self.assertEqual("Renamed the game", result.summary)
+        self.assertEqual(["pubspec.yaml"], result.files_changed)
+        # The envelope session id becomes the provider reference by default.
+        self.assertEqual("sess-9", result.provider_reference)
+
+    @mock.patch("devloop.adapters.claude.subprocess.run")
+    def test_error_envelope_is_failure(self, run):
+        run.return_value = mock.Mock(
+            returncode=0, stderr="",
+            stdout=json.dumps({"type": "result", "subtype": "error_max_turns",
+                               "is_error": True, "result": ""}),
+        )
+        result = ClaudeAdapter().run(task())
+        self.assertEqual("failed", result.outcome)
+        self.assertIn("error_max_turns", result.summary)
+
+    @mock.patch("devloop.adapters.claude.subprocess.run")
+    def test_unstructured_result_is_failure(self, run):
+        run.return_value = mock.Mock(
+            returncode=0, stderr="",
+            stdout=json.dumps({"type": "result", "subtype": "success",
+                               "is_error": False,
+                               "result": "I could not complete the task."}),
+        )
+        result = ClaudeAdapter().run(task())
+        self.assertEqual("failed", result.outcome)
+        self.assertIn("did not return a structured worker result", result.summary)
+
+    @mock.patch("devloop.adapters.claude.subprocess.run")
     def test_timeout_is_normalized(self, run):
         run.side_effect = subprocess.TimeoutExpired("claude", 1)
         result = ClaudeAdapter(timeout_seconds=1).run(task())

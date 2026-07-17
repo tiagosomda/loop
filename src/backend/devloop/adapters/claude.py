@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from typing import Any
 
@@ -56,16 +57,55 @@ class ClaudeAdapter:
             return WorkerResult(outcome="failed", summary="Claude Code failed.")
         try:
             envelope = json.loads(completed.stdout)
-            data = envelope.get("structured_output", envelope)
+        except json.JSONDecodeError as exc:
+            return WorkerResult(
+                outcome="failed",
+                summary=f"Claude Code returned non-JSON output: {exc}",
+            )
+        if envelope.get("is_error"):
+            return WorkerResult(
+                outcome="failed",
+                summary=(f"Claude Code reported an error "
+                         f"({envelope.get('subtype') or 'unknown'})."),
+            )
+        data = self._worker_result(envelope)
+        if data is None:
+            return WorkerResult(
+                outcome="failed",
+                summary="Claude Code did not return a structured worker result.",
+            )
+        try:
             return WorkerResult(
                 outcome=data["outcome"], summary=data["summary"],
-                files_changed=data["filesChanged"],
-                verification=data["verification"],
-                provider_reference=data.get("providerReference"),
-                metadata=data.get("metadata", {}),
+                files_changed=data.get("filesChanged", []),
+                verification=data.get("verification", []),
+                provider_reference=(data.get("providerReference")
+                                    or envelope.get("session_id")),
+                metadata=data.get("metadata") or {},
             )
-        except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        except (KeyError, TypeError) as exc:
             return WorkerResult(
                 outcome="failed",
                 summary=f"Claude Code returned an invalid result: {exc}",
             )
+
+    @staticmethod
+    def _worker_result(envelope: dict[str, Any]) -> dict[str, Any] | None:
+        """Recover the structured worker result from a Claude Code json envelope.
+
+        `claude --print --output-format json` returns the model's answer as text
+        in `result`, typically wrapped in a ```json ... ``` markdown fence; a
+        pre-parsed `structured_output` object is also accepted when present.
+        Returns the result mapping, or None when no structured payload exists."""
+        candidate = envelope.get("structured_output")
+        if isinstance(candidate, dict):
+            return candidate
+        text = envelope.get("result")
+        if not isinstance(text, str):
+            return None
+        fence = re.match(r"^```(?:json)?\s*(.*?)\s*```$", text.strip(), re.DOTALL)
+        try:
+            parsed = json.loads(fence.group(1) if fence else text)
+        except json.JSONDecodeError:
+            return None
+        return parsed if isinstance(parsed, dict) else None
