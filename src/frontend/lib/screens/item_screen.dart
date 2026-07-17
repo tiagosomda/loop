@@ -173,11 +173,10 @@ class _ItemHeader extends StatelessWidget {
                   ],
                 ),
               ),
-              if (item.status == 'open')
-                TextButton(
-                  onPressed: () => _editRoutingPreferences(context, item),
-                  child: const Text('Customize'),
-                ),
+              TextButton(
+                onPressed: () => _editRoutingPreferences(context, item),
+                child: const Text('Customize'),
+              ),
             ],
           ),
           StreamBuilder<AgentRun?>(
