@@ -1191,8 +1191,9 @@ void openItem(BuildContext context, String itemId) {
   ).push(MaterialPageRoute(builder: (_) => ItemScreen(itemId: itemId)));
 }
 
-/// Grab handle for manual reordering: a small grip glyph that only the
-/// handle itself starts a drag from, so the rest of the card stays tappable.
+/// Grab handle for manual reordering. The glyph stays visually compact, while
+/// its full 48×48 touch target starts dragging immediately on movement so it
+/// is easy to grab without accidentally long-pressing the card to select it.
 class DragHandle extends StatelessWidget {
   const DragHandle({super.key, required this.index});
 
@@ -1205,14 +1206,14 @@ class DragHandle extends StatelessWidget {
       index: index,
       child: MouseRegion(
         cursor: SystemMouseCursors.grab,
-        child: Padding(
-          // Generous hit target — a bare icon is too small to grab reliably,
-          // especially on touch.
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-          child: Icon(
-            Icons.drag_indicator,
-            size: 20,
-            color: scheme.onSurface.withValues(alpha: 0.35),
+        child: SizedBox.square(
+          dimension: 48,
+          child: Center(
+            child: Icon(
+              Icons.drag_indicator,
+              size: 24,
+              color: scheme.onSurface.withValues(alpha: 0.35),
+            ),
           ),
         ),
       ),

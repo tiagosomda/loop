@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:dev_loop/models/models.dart';
+import 'package:dev_loop/screens/home_screen.dart';
 import 'package:dev_loop/screens/new_item_sheet.dart';
 import 'package:dev_loop/screens/text_editor_screen.dart';
 import 'package:dev_loop/services/board_service.dart';
@@ -283,6 +284,24 @@ void main() {
       await tester.tap(find.text('Selectable item'));
       expect(selected, isFalse);
     });
+  });
+
+  testWidgets('drag handle has a forgiving immediate touch target', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: Center(child: DragHandle(index: 0))),
+      ),
+    );
+
+    final listenerFinder = find.byType(ReorderableDragStartListener);
+    expect(listenerFinder, findsOneWidget);
+    expect(tester.getSize(listenerFinder), const Size.square(48));
+    expect(find.byType(ReorderableDelayedDragStartListener), findsNothing);
+
+    final icon = tester.widget<Icon>(find.byIcon(Icons.drag_indicator));
+    expect(icon.size, 24);
   });
 
   test('routing catalog visibility is entirely data driven', () {
