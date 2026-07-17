@@ -43,6 +43,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return local.hour == nextLocal.hour && local.minute == nextLocal.minute;
   }
 
+  bool _isCurrentSession(ScheduledSession session) {
+    final now = DateTime.now();
+    final local = session.startsAt.toLocal();
+    final todayStart = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      local.hour,
+      local.minute,
+    );
+    final diff = now.difference(todayStart);
+    return diff >= Duration.zero && diff <= const Duration(hours: 1);
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
@@ -202,30 +216,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         children: [
                           if (sessionTimes.isNotEmpty)
                             for (final session in sessionTimes)
-                              Tooltip(
-                                message:
-                                    '${_isNextSession(session, nextSession) ? 'Next · ' : ''}'
-                                    '${session.isSelfHealing ? 'Self-healing session' : 'Dev-loop session'}',
-                                child: Chip(
-                                  backgroundColor:
-                                      _isNextSession(session, nextSession)
-                                      ? scheme.primaryContainer
-                                      : null,
-                                  avatar: Icon(
-                                    session.isSelfHealing
-                                        ? Icons.healing
-                                        : Icons.alarm,
-                                    size: 14,
-                                  ),
-                                  label: Text(
-                                    _scheduleLabel(session.startsAt),
-                                    style: _isNextSession(session, nextSession)
-                                        ? const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                          )
-                                        : null,
-                                  ),
-                                ),
+                              Builder(
+                                builder: (context) {
+                                  final isNext = _isNextSession(
+                                    session,
+                                    nextSession,
+                                  );
+                                  final isCurrent = _isCurrentSession(
+                                    session,
+                                  );
+                                  final highlighted = isNext || isCurrent;
+                                  return Tooltip(
+                                    message:
+                                        '${isNext
+                                            ? 'Next · '
+                                            : isCurrent
+                                            ? 'Current · '
+                                            : ''}'
+                                        '${session.isSelfHealing ? 'Self-healing session' : 'Dev-loop session'}',
+                                    child: Chip(
+                                      backgroundColor: isNext
+                                          ? scheme.primaryContainer
+                                          : isCurrent
+                                          ? scheme.secondaryContainer
+                                          : null,
+                                      avatar: Icon(
+                                        session.isSelfHealing
+                                            ? Icons.healing
+                                            : Icons.alarm,
+                                        size: 14,
+                                      ),
+                                      label: Text(
+                                        _scheduleLabel(session.startsAt),
+                                        style: highlighted
+                                            ? const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                              )
+                                            : null,
+                                      ),
+                                    ),
+                                  );
+                                },
                               )
                           else
                             for (final label
