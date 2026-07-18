@@ -76,6 +76,7 @@ class ActionItem {
 class RoutingTarget {
   final String targetId;
   final String adapter;
+  final String displayName;
   final String location;
   final List<String> models;
   final Map<String, String> modelLabels;
@@ -84,6 +85,7 @@ class RoutingTarget {
   const RoutingTarget({
     required this.targetId,
     required this.adapter,
+    required this.displayName,
     required this.location,
     required this.models,
     this.modelLabels = const {},
@@ -93,6 +95,7 @@ class RoutingTarget {
   factory RoutingTarget.fromMap(Map<String, dynamic> map) => RoutingTarget(
     targetId: map['targetId'] ?? '',
     adapter: map['adapter'] ?? '',
+    displayName: map['displayName'] ?? map['adapter'] ?? '',
     location: map['location'] ?? '',
     models: [
       for (final value in (map['models'] as List? ?? [])) value.toString(),
@@ -140,6 +143,9 @@ class RoutingCatalog {
 
   List<String> get providers =>
       targets.map((target) => target.adapter).toSet().toList(growable: false);
+
+  String providerLabel(String adapter) =>
+      targetForAdapter(adapter)?.displayName ?? adapter;
 
   List<String> modelsForProvider(String? adapter) => targets
       .where((target) => adapter == null || target.adapter == adapter)

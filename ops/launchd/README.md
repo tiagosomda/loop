@@ -3,8 +3,9 @@
 The workflow is owned by two user LaunchAgents, not by Codex or Claude
 schedules:
 
-- `com.devloop.llama-server` keeps the local Gemma router available on
-  `127.0.0.1:8080` and restarts it after a crash.
+- `com.devloop.llama-server` keeps Gemma available on `127.0.0.1:8080` for
+  both routing decisions and the bounded Local Gemma worker, and restarts it
+  after a crash.
 - `com.devloop.orchestrator` runs `devloop run autonomous` at 00:15, 01:30,
   05:15, 10:15, 13:15, 15:15, 17:15, and 20:15 machine-local time. The published schedule
   interprets these slots in `DEV_LOOP_SCHEDULE_TIMEZONE` (default:
@@ -52,6 +53,8 @@ starting a second queue worker.
 
 ```bash
 curl http://127.0.0.1:8080/health
+src/backend/.venv/bin/python src/backend/devloop.py \
+  targets list --role worker --enabled-only
 launchctl print gui/$(id -u)/com.devloop.llama-server
 launchctl print gui/$(id -u)/com.devloop.orchestrator
 tail -f data/llama-server.error.log data/orchestrator.error.log

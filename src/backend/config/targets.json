@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "2026-07-17.2",
+  "catalogVersion": "2026-07-18.1",
   "fallbackAssignment": {
-    "targetId": "claude-standard",
-    "provider": "claude-code",
-    "model": "claude-opus-4-8",
+    "targetId": "codex-standard",
+    "provider": "codex",
+    "model": "gpt-5.6-sol",
     "effort": "high"
   },
   "targets": [
@@ -12,6 +12,7 @@
       "targetId": "local-gemma-router",
       "role": "router",
       "adapter": "llama-cpp",
+      "displayName": "Local Gemma Router",
       "location": "local",
       "enabled": true,
       "models": ["gemma-3-4b-it"],
@@ -28,8 +29,9 @@
       "targetId": "codex-standard",
       "role": "worker",
       "adapter": "codex",
+      "displayName": "Codex",
       "location": "cloud",
-      "enabled": false,
+      "enabled": true,
       "models": ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"],
       "modelLabels": {
         "gpt-5.6-sol": "GPT-5.6 Sol",
@@ -48,8 +50,9 @@
       "targetId": "claude-standard",
       "role": "worker",
       "adapter": "claude-code",
+      "displayName": "Claude Code",
       "location": "cloud",
-      "enabled": true,
+      "enabled": false,
       "models": ["claude-opus-4-8", "claude-sonnet-5", "claude-fable-5"],
       "modelLabels": {
         "claude-opus-4-8": "Claude Opus 4.8",
@@ -62,6 +65,26 @@
       "supportsRepositoryWrites": true,
       "supportsNetwork": true,
       "costTier": "medium",
+      "concurrencyLimit": 1
+    },
+    {
+      "targetId": "local-gemma-worker",
+      "role": "worker",
+      "adapter": "local-agent",
+      "displayName": "Local Gemma",
+      "location": "local",
+      "enabled": true,
+      "models": ["gemma-3-4b-it"],
+      "modelLabels": {
+        "gemma-3-4b-it": "Gemma 3 4B (Local)"
+      },
+      "effortLevels": ["low"],
+      "endpoint": "http://127.0.0.1:8080",
+      "contextLimit": 4096,
+      "supportsImages": false,
+      "supportsRepositoryWrites": true,
+      "supportsNetwork": false,
+      "costTier": "free",
       "concurrencyLimit": 1
     }
   ]

@@ -6,6 +6,10 @@ provider-neutral orchestrator routes them to an enabled worker, works across
 the repos under `dev/`, and writes results back to the board. See
 [docs/design.md](docs/design.md).
 
+The enabled workers are Codex for general implementation work and the locally
+hosted Gemma 3 4B model for small, low-risk inspections and single-file edits.
+Claude Code remains implemented but disabled in the target catalog.
+
 ## Layout
 
 - `src/frontend` — Flutter web board UI, deployed to <https://tiago.dev/loop>

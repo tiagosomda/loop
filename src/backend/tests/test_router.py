@@ -34,6 +34,33 @@ def decision():
 
 
 class RouterTests(unittest.TestCase):
+    @mock.patch("devloop.router.repos.get", return_value={"name": "Repo", "path": "repo"})
+    @mock.patch("devloop.router.targets.enabled_available_workers")
+    @mock.patch("devloop.router.items.show_item")
+    def test_attachment_filters_worker_without_attachment_support(
+        self, show_item, workers, _repo
+    ):
+        show_item.return_value = {
+            "id": "item-1", "title": "Visual task", "status": "open",
+            "repoId": "repo", "messages": [{
+                "author": "user", "text": "Match this image",
+                "attachments": [{"name": "reference.png", "contentType": "image/png"}],
+            }],
+        }
+        base = {
+            "models": ["default"], "effortLevels": ["low"],
+            "supportsImages": False,
+        }
+        workers.return_value = [
+            {**base, "targetId": "local", "adapter": "local-agent"},
+            {**base, "targetId": "codex", "adapter": "codex", "supportsImages": True},
+        ]
+
+        built = router.build_context("item-1")
+
+        self.assertEqual(["codex"], [target["targetId"]
+                                     for target in built["allowedTargets"]])
+
     def test_no_available_target_abstains_before_inference(self):
         value = context()
         value["allowedTargets"] = []

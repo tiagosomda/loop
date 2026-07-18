@@ -2,11 +2,12 @@
 
 ## Status
 
-The foreground single-worker pilot is implemented as of 2026-07-14: a
+The foreground single-worker pilot is implemented as of 2026-07-18: a
 launchd-triggered deterministic orchestrator uses a local llama.cpp router,
-transactionally claims an item with its run record, and dispatches to Codex
-through a trusted full-access adapter. Claude routing is implemented but its
-catalog target remains disabled and has not been live-tested.
+transactionally claims an item with its run record, and dispatches either to
+Codex through a trusted full-access adapter or to a bounded local Gemma worker
+for small, low-risk tasks. Claude routing is implemented but its catalog target
+is disabled after proving flaky in live use.
 
 This is still an end-state design document. Bounded research/handoff bundles,
 artifact reaping, resumable provider sessions, cancellation, leases,
@@ -110,8 +111,10 @@ The remaining gaps are the later end-state phases:
 4. Optional bounded local research and manifest-owned handoff bundles are not
    implemented.
 5. Provider diagnostic artifacts have no formal retention/reaper policy yet.
-6. Claude is structurally implemented but intentionally disabled and not
-   live-tested; Gemini and a local coding worker remain out of scope.
+6. Claude is structurally implemented but intentionally disabled; Gemini and
+   broader local-agent capabilities remain out of scope. The Local Gemma worker
+   is deliberately limited to repository inspection, validated patches,
+   network-denied checks, and deterministic Git delivery.
 
 ## Recommended end state
 
@@ -151,7 +154,7 @@ judgments inside explicit contracts.
 ## Scheduler recommendation
 
 Use the operating system scheduler as the wake-up mechanism. On this machine,
-`launchd` runs the provider-neutral autonomous command at the six configured
+`launchd` runs the provider-neutral autonomous command at the configured
 machine-local times. A separate always-on LaunchAgent supervises llama-server.
 
 Neither Codex nor Claude schedules own orchestration. Codex is invoked only as
@@ -894,8 +897,8 @@ The foreground router-controlled pilot is ready when:
   thread before its worker message;
 - fresh items route before claim and are revalidated at dispatch;
 - in-progress items are never silently rerouted and do not block later work;
-- a fake adapter and Codex pass the lifecycle contract, while the disabled
-  Claude adapter passes its mocked structural contract;
+- a fake adapter, Codex, and the bounded Local Gemma worker pass the lifecycle
+  contract, while the disabled Claude adapter passes its mocked contract;
 - timeout, authentication, sandbox, rate-limit, and write-back failures leave
   useful recoverable state;
 - one item is finalized before the next is dispatched;
@@ -909,7 +912,8 @@ heartbeats, bounded retries, and parallelism are acceptance criteria for Tasks
 
 ## Open decisions
 
-1. Which later local coding worker, if any, should be added alongside Codex?
+1. Should Local Gemma expand beyond small validated patches, and what evidence
+   would justify broader tools?
 2. Should a fully specified valid user override bypass local inference, or
    should the router always confirm it?
 3. What normalized effort vocabulary should dev-loop expose?
@@ -932,5 +936,6 @@ heartbeats, bounded retries, and parallelism are acceptance criteria for Tasks
 
 The implemented pilot makes provider/model/effort optional, validates a local
 catalog, routes with Gemma through llama.cpp, dispatches Codex with full access
-inside a trusted adapter, and uses launchd for both router supervision and
-calendar orchestration. Claude remains data-disabled until explicitly enabled.
+inside a trusted adapter, can dispatch small low-risk work to a bounded local
+Gemma adapter, and uses launchd for both model supervision and calendar
+orchestration. Claude remains data-disabled until explicitly enabled.

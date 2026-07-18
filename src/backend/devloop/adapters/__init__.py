@@ -2,6 +2,7 @@
 
 from .claude import ClaudeAdapter
 from .codex import CodexAdapter
+from .local_llama import LocalLlamaAdapter
 
 
 def for_target(target):
@@ -12,4 +13,6 @@ def for_target(target):
         if not target.get("enabled"):
             raise RuntimeError("Claude target is disabled by configuration")
         return ClaudeAdapter(target.get("executable", "claude"))
+    if adapter == "local-agent":
+        return LocalLlamaAdapter(target["endpoint"])
     raise RuntimeError(f"unsupported provider adapter {adapter!r}")

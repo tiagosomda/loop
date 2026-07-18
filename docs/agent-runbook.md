@@ -95,13 +95,11 @@ transcripts — decides whether the reviewer's findings are blocking, and
 either sends the implementer sub-agent a follow-up (continuing the same
 sub-agent so it keeps full context) or proceeds to write-back.
 
-This split is worth the overhead for `effortLevel: medium`/`high` items.
-For `effortLevel: low` or `model: haiku` items, skip the separate reviewer
-and just delegate to a single cheap-model sub-agent as before — the
-coordination cost isn't worth it for small work. Pass the item's `model`
-hint through to the implementer sub-agent when spawning it; the
-coordinator's own model is fixed by how the scheduled run itself was
-invoked.
+This split is worth the overhead for `effortLevel: medium`/`high` items. For
+low-effort items, skip a separate reviewer when the work is genuinely small;
+the coordination cost is not worthwhile. The provider-neutral router may
+select the bounded Local Gemma worker, while complex or high-risk work should
+remain on Codex.
 
 Trivial, non-code changes (a one-line doc tweak, a status question) don't
 need the full split either — use judgment rather than spawning sub-agents
@@ -151,19 +149,16 @@ for their own sake.
 
 ## 5. Usage budget
 
-Runs share the user's Claude subscription, so treat capacity as finite, but
-there is no fixed item-count cap — work through every `open`/`in-progress`
-item in the queue, in-progress before open and then by the board's manual
-order, re-fetching per section 2 as you go:
+Cloud runs use finite account capacity, while Local Gemma uses the supervised
+on-device runtime. There is no fixed item-count cap — work through every
+`open`/`in-progress` item in the queue, in-progress before open and then by the
+board's manual order, re-fetching per section 2 as you go:
 
 - Finish items **one at a time** (post results + set status before starting
   the next) so hitting a limit mid-run never strands more than one item.
-- Match spend to the item's hints: for `effortLevel: low` or `model: haiku`
-  items, delegate the work to a subagent on that cheaper model and keep your
-  own orchestration thin.
-- There is currently no way to check remaining subscription usage before or
-  during a run — Claude Code doesn't expose the relevant rate-limit headers
-  to hooks, scripts, or `--print` mode. Treat this as purely **reactive**:
+- Match execution cost to the item's hints: prefer Local Gemma only for small,
+  low-risk work within its bounded tools, and Codex for broader work.
+- Treat cloud capacity failures **reactively**:
   if you notice actual rate-limit errors or the run getting cut short, stop
   starting new work immediately, post partial progress to the current
   item's thread as an intentional hand-off, leave it `in-progress`, log it

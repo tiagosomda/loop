@@ -4,10 +4,11 @@
 
 dev-loop is an experiment in autonomous, agent-driven development. The user
 writes **action items** (bugs, tasks, features, ideas) to a **board**. A
-**scheduled agent** (Claude Code scheduled task) wakes up periodically, pulls
-the open items from the board, works on them across the user's repos using
-best-practice agentic workflows, and writes results back to the board. The
-user reviews the results and has the final call on closing items.
+**scheduled orchestrator** (a local launchd job) wakes up periodically, pulls
+the open items from the board, routes each item to an enabled worker, and
+writes results back to the board. Codex handles general work; a bounded local
+Gemma worker can handle small, low-risk work. The user reviews the results and
+has the final call on closing items.
 
 ```
 ┌───────────────┐      writes items       ┌─────────────────────┐
@@ -17,8 +18,8 @@ user reviews the results and has the final call on closing items.
 └───────────────┘                                   │ reads open items,
                                                     │ writes updates
                                           ┌─────────┴───────────┐
-                                          │  Scheduled agent    │
-                                          │  (Claude Code, ~5h) │
+                                          │ Local orchestrator  │
+                                          │ Codex / Local Gemma │
                                           │  works in dev/*     │
                                           └─────────────────────┘
 ```
@@ -202,9 +203,9 @@ follow-system themes. Lean on Material 3 + established packages
    (list + kanban + search/filter/sort), item detail thread with
    attachments, new-item flow, profile, logged-out landing.
 5. **Deploy** — GitHub Pages workflow (`--base-href /loop/`).
-6. **Agent loop** — `docs/agent-runbook.md` + Claude Code scheduled task at
-   00:15/01:30/05:15/10:15/13:15/15:15/17:15/20:15; `schedule update` + `repos crawl` run at
-   the end of setup and periodically thereafter.
+6. **Agent loop** — provider-neutral `run autonomous` launched by launchd at
+   00:15/01:30/05:15/10:15/13:15/15:15/17:15/20:15; `schedule update` +
+   `repos crawl` run at the end of setup and periodically thereafter.
 7. **Later / nice-to-have** — thumbnails for image attachments, item
    labels/priorities, notifications when items hit `needs-review`, board
    cache in `data/` for faster agent startup.

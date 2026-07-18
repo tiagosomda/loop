@@ -293,7 +293,7 @@ class _RoutingPreferences extends StatelessWidget {
                         for (final adapter in catalog.providers)
                           DropdownMenuItem(
                             value: adapter,
-                            child: Text(adapter),
+                            child: Text(catalog.providerLabel(adapter)),
                           ),
                       ],
                       onChanged: onProvider,
@@ -348,11 +348,11 @@ class _RoutingPreferences extends StatelessWidget {
           },
         ),
         const SizedBox(height: 8),
-        const Align(
+        Align(
           alignment: Alignment.centerLeft,
           child: Text(
-            'Codex workers run unattended with full access under your macOS user.',
-            style: TextStyle(fontSize: 12),
+            routingSecurityNote(provider),
+            style: const TextStyle(fontSize: 12),
           ),
         ),
       ],
@@ -362,6 +362,15 @@ class _RoutingPreferences extends StatelessWidget {
 
 double routingPreferenceFieldWidth(double availableWidth) =>
     availableWidth >= 720 ? (availableWidth - 24) / 3 : availableWidth;
+
+String routingSecurityNote(String? provider) => switch (provider) {
+  'local-agent' =>
+    'Local Gemma uses bounded repository tools, network-denied checks, and low effort.',
+  'codex' =>
+    'Codex runs unattended with full access under your macOS user.',
+  _ =>
+    'Automatic routing may use bounded Local Gemma or full-access Codex.',
+};
 
 String _repoLabel(RepoInfo r) => r.path.isEmpty ? r.name : r.path;
 

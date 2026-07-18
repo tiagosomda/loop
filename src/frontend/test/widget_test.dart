@@ -318,6 +318,7 @@ void main() {
         {
           'targetId': 'codex-standard',
           'adapter': 'codex',
+          'displayName': 'Codex',
           'location': 'cloud',
           'models': ['default'],
           'effortLevels': ['low', 'high'],
@@ -329,6 +330,7 @@ void main() {
     ]);
     expect(catalog.target('claude-standard'), isNull);
     expect(catalog.providers, ['codex']);
+    expect(catalog.providerLabel('codex'), 'Codex');
   });
 
   test('automatic provider exposes the union of catalog options', () {
@@ -353,6 +355,7 @@ void main() {
         {
           'targetId': 'claude',
           'adapter': 'claude-code',
+          'displayName': 'Claude Code',
           'location': 'cloud',
           'models': ['sonnet'],
           'effortLevels': ['high'],
@@ -376,11 +379,19 @@ void main() {
       'Codex Special',
     );
     expect(catalog.modelLabel('unknown', adapter: 'codex'), 'unknown');
+    expect(catalog.providerLabel('claude-code'), 'Claude Code');
+    expect(catalog.providerLabel('unknown'), 'unknown');
   });
 
   test('routing preferences use responsive widths', () {
     expect(routingPreferenceFieldWidth(900), 292);
     expect(routingPreferenceFieldWidth(719), 719);
+  });
+
+  test('routing security note reflects the selected provider', () {
+    expect(routingSecurityNote('local-agent'), contains('bounded repository'));
+    expect(routingSecurityNote('codex'), contains('full access'));
+    expect(routingSecurityNote(null), contains('Automatic routing'));
   });
 
   test('routing labels render assignment and lifecycle state', () {

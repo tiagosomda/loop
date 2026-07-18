@@ -29,10 +29,15 @@ python3 -m venv .venv
 
 The target catalog lives in `config/targets.json`. Provider and model choices
 are data-driven: safe projections omit command paths and local endpoints, and
-`--enabled-only` excludes disabled providers such as the initial Claude target.
+`--enabled-only` excludes disabled providers such as Claude. Codex is the
+configured fallback. The enabled Local Gemma worker shares the supervised
+llama.cpp endpoint with the router and is intended only for small, low-risk
+tasks. Its trusted adapter exposes bounded file inspection, validated patches,
+network-denied checks, and deterministic commit/push delivery rather than a
+general model-controlled shell.
 
 Local scheduling and llama-server supervision are documented in
-`../../ops/launchd/README.md`. Codex and Claude schedules are not part of the
+`../../ops/launchd/README.md`. Provider-owned schedules are not part of the
 autonomous workflow.
 
 ## Shared security rules — read before touching

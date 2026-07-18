@@ -243,7 +243,10 @@ Future<void> _editRoutingPreferences(
                     items: [
                       const DropdownMenuItem(value: null, child: Text('Auto')),
                       for (final value in catalog.providers)
-                        DropdownMenuItem(value: value, child: Text(value)),
+                        DropdownMenuItem(
+                          value: value,
+                          child: Text(catalog.providerLabel(value)),
+                        ),
                     ],
                     onChanged: (value) => setDialogState(() {
                       provider = value;

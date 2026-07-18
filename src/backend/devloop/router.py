@@ -48,9 +48,11 @@ def build_context(item_id: str) -> dict[str, Any]:
         "model": item.get("requestedModel", item.get("model")),
         "effort": item.get("requestedEffort", item.get("effortLevel")),
     }
+    requires_attachment_support = bool(_attachment_metadata(item))
     workers = [
         target for target in targets.enabled_available_workers()
-        if _matches_request(target, requested)
+        if (_matches_request(target, requested) and
+            (not requires_attachment_support or target.get("supportsImages")))
     ]
     return {
         "schemaVersion": 1,
@@ -131,7 +133,10 @@ def decide(context: dict[str, Any], timeout: float = 60.0) -> dict[str, Any]:
     prompt = (
         "You are a routing classifier. Select exactly one allowed target. "
         "Honor every non-null requested value as a hard constraint. Prefer "
-        "the lowest sufficient effort. Return only the required JSON object; "
+        "the local free worker for small, low-risk tasks that need only simple "
+        "repository inspection or edits; use Codex for complex, broad, visual, "
+        "or high-risk work. Prefer the lowest sufficient effort. Return only "
+        "the required JSON object; "
         "do not include private reasoning. Routing context:\n" +
         json.dumps(context, separators=(",", ":"), sort_keys=True)
     )

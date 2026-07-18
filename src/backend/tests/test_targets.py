@@ -27,21 +27,27 @@ class TargetCatalogTests(unittest.TestCase):
             codex["models"],
         )
         self.assertEqual("GPT-5.6 Sol", codex["modelLabels"]["gpt-5.6-sol"])
-        self.assertFalse(codex["enabled"])
+        self.assertTrue(codex["enabled"])
         self.assertEqual({
-            "targetId": "claude-standard",
-            "provider": "claude-code",
-            "model": "claude-opus-4-8",
+            "targetId": "codex-standard",
+            "provider": "codex",
+            "model": "gpt-5.6-sol",
             "effort": "high",
         }, catalog["fallbackAssignment"])
         claude = next(target for target in catalog["targets"]
                       if target["targetId"] == "claude-standard")
-        self.assertTrue(claude["enabled"])
+        self.assertFalse(claude["enabled"])
         self.assertEqual(
             ["claude-opus-4-8", "claude-sonnet-5", "claude-fable-5"],
             claude["models"],
         )
         self.assertEqual("Claude Fable 5", claude["modelLabels"]["claude-fable-5"])
+        local = next(target for target in catalog["targets"]
+                     if target["targetId"] == "local-gemma-worker")
+        self.assertTrue(local["enabled"])
+        self.assertEqual("local-agent", local["adapter"])
+        self.assertEqual(["gemma-3-4b-it"], local["models"])
+        self.assertEqual("Local Gemma", local["displayName"])
 
     def test_duplicate_target_is_rejected(self):
         catalog = targets.load()
@@ -69,22 +75,30 @@ class TargetCatalogTests(unittest.TestCase):
 
     @mock.patch("devloop.targets.subprocess.run")
     @mock.patch("devloop.targets.shutil.which", return_value="/usr/bin/worker")
-    def test_enabled_worker_projection_includes_only_enabled_workers(self, _which, run):
+    @mock.patch("devloop.targets.requests.get")
+    def test_enabled_worker_projection_includes_only_enabled_workers(
+        self, get, _which, run
+    ):
         run.return_value.returncode = 0
+        get.return_value.json.return_value = {"status": "ok"}
         projection = targets.safe_projection(role="worker", enabled_only=True)
-        self.assertEqual(["claude-standard"],
+        self.assertEqual(["codex-standard", "local-gemma-worker"],
                          [target["targetId"] for target in projection["targets"]])
         self.assertNotIn("executable", projection["targets"][0])
         self.assertNotIn("endpoint", projection["targets"][0])
+        self.assertEqual("Local Gemma", projection["targets"][1]["displayName"])
 
     @mock.patch("devloop.targets.subprocess.run")
     @mock.patch("devloop.targets.shutil.which", return_value="/usr/bin/worker")
-    def test_enabling_codex_in_data_makes_it_visible(self, _which, run):
+    def test_enabling_claude_in_data_makes_it_visible(self, _which, run):
         run.return_value.returncode = 0
         catalog = targets.load()
-        codex = next(target for target in catalog["targets"]
-                     if target["targetId"] == "codex-standard")
-        codex["enabled"] = True
+        claude = next(target for target in catalog["targets"]
+                      if target["targetId"] == "claude-standard")
+        claude["enabled"] = True
+        local = next(target for target in catalog["targets"]
+                     if target["targetId"] == "local-gemma-worker")
+        local["enabled"] = False
         projection = targets.safe_projection(
             role="worker", enabled_only=True, path=self._catalog_file(catalog))
         self.assertEqual(
@@ -109,10 +123,14 @@ class TargetCatalogTests(unittest.TestCase):
 
     @mock.patch("devloop.targets.subprocess.run")
     @mock.patch("devloop.targets.shutil.which", return_value="/usr/bin/provider")
-    def test_frontend_projection_is_selectable_and_data_driven(self, _which, run):
+    @mock.patch("devloop.targets.requests.get")
+    def test_frontend_projection_is_selectable_and_data_driven(
+        self, get, _which, run
+    ):
         run.return_value.returncode = 0
+        get.return_value.json.return_value = {"status": "ok"}
         projection = targets.frontend_projection()
-        self.assertEqual(["claude-standard"],
+        self.assertEqual(["codex-standard", "local-gemma-worker"],
                          [target["targetId"] for target in projection["targets"]])
         self.assertNotIn("availability", projection["targets"][0])
 
@@ -120,7 +138,7 @@ class TargetCatalogTests(unittest.TestCase):
     @mock.patch("devloop.targets.shutil.which", return_value="/usr/bin/codex")
     def test_codex_must_be_authenticated_to_be_available(self, _which, run):
         run.return_value.returncode = 1
-        codex = dict(targets.load()["targets"][1], enabled=True)
+        codex = dict(targets.load()["targets"][1])
         self.assertEqual(
             {"available": False, "reason": "not-authenticated"},
             targets.probe(codex),

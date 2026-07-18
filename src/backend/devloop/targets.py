@@ -21,7 +21,7 @@ _ROLES = {"router", "worker"}
 _LOCATIONS = {"local", "cloud"}
 _EFFORTS = {"low", "medium", "high", "max"}
 _SAFE_FIELDS = (
-    "targetId", "role", "adapter", "location", "models", "modelLabels",
+    "targetId", "role", "adapter", "displayName", "location", "models", "modelLabels",
     "effortLevels",
     "contextLimit", "supportsImages", "supportsRepositoryWrites",
     "supportsNetwork", "costTier", "concurrencyLimit",
@@ -70,6 +70,10 @@ def validate(catalog: dict[str, Any]) -> None:
             raise CatalogError(f"invalid location for {target_id!r}")
         if not isinstance(target["enabled"], bool):
             raise CatalogError(f"enabled must be boolean for {target_id!r}")
+        if ("displayName" in target and
+                (not isinstance(target["displayName"], str) or
+                 not target["displayName"].strip())):
+            raise CatalogError(f"invalid displayName for {target_id!r}")
         if not _nonempty_strings(target["models"]):
             raise CatalogError(f"models must be non-empty strings for {target_id!r}")
         labels = target.get("modelLabels", {})
@@ -115,7 +119,7 @@ def probe(target: dict[str, Any], timeout: float = 1.0) -> dict[str, Any]:
         return {"available": False, "reason": "disabled-by-configuration"}
 
     adapter = target["adapter"]
-    if adapter == "llama-cpp":
+    if adapter in {"llama-cpp", "local-agent"}:
         endpoint = target.get("endpoint")
         if not isinstance(endpoint, str) or not endpoint.startswith("http://127.0.0.1:"):
             return {"available": False, "reason": "invalid-local-endpoint"}
